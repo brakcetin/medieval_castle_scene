@@ -1,354 +1,411 @@
+// filepath: c:\Users\brakc\Burak\Computer Science\GaziU\3.2\computer_graphics\project\js\objects.js
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// Base class for interactive objects
-class InteractiveObject {
-    constructor(scene, position) {
+export class Catapult {
+    constructor(scene) {
         this.scene = scene;
-        this.position = position;
-        this.mesh = null;
-        this.isInteractive = true;
+        this.model = null;
+        this.loaded = false;
+        this.angle = 0;
+        this.power = 50;
+        this.maxPower = 100;
+        this.charging = false;
+        this.animationTime = 0;
+        this.armRotation = 0;
+        this.animating = false;
+        
+        // Position and properties
+        this.position = new THREE.Vector3(0, 0, 10);
+        this.radius = 2;
+        
+        // Catapult parts
+        this.base = null;
+        this.arm = null;
+        this.bucket = null;
     }
-    
-    update() {
-        // Override in subclasses
-    }
-}
-
-export class Catapult extends InteractiveObject {
-    constructor(scene, position) {
-        super(scene, position);
-        this.loadedStone = null;
-        this.isReady = true;
-        this.launchForce = 15;
-        
-        this.createCatapult();
-    }
-    
-    createCatapult() {
-        // Create catapult base
-        const baseGeometry = new THREE.BoxGeometry(2, 0.5, 3);
-        const baseMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x8B4513, // Brown color
-            roughness: 0.8,
-            metalness: 0.2
-        });
-        this.base = new THREE.Mesh(baseGeometry, baseMaterial);
-        this.base.position.copy(this.position);
-        this.base.position.y += 0.25;
-        this.base.castShadow = true;
-        this.base.receiveShadow = true;
-        this.scene.add(this.base);
-        
-        // Create catapult arm
-        const armGeometry = new THREE.BoxGeometry(0.3, 0.3, 2.5);
-        const armMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x8B4513,
-            roughness: 0.7,
-            metalness: 0.3
-        });
-        this.arm = new THREE.Mesh(armGeometry, armMaterial);
-        this.arm.position.copy(this.position);
-        this.arm.position.y += 0.7;
-        this.arm.rotation.x = Math.PI / 12; // Slight angle
-        this.arm.castShadow = true;
-        this.arm.receiveShadow = true;
-        this.scene.add(this.arm);
-        
-        // Create arm holder/pivot
-        const pivotGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.6, 8);
-        const pivotMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x4d4d4d,
-            roughness: 0.6,
-            metalness: 0.5
-        });
-        this.pivot = new THREE.Mesh(pivotGeometry, pivotMaterial);
-        this.pivot.position.copy(this.position);
-        this.pivot.position.y += 0.6;
-        this.pivot.position.z += 0.5;
-        this.pivot.rotation.x = Math.PI / 2;
-        this.pivot.castShadow = true;
-        this.scene.add(this.pivot);
-        
-        // Create basket for stone
-        const basketGeometry = new THREE.BoxGeometry(0.5, 0.1, 0.5);
-        const basketMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x5c4033,
-            roughness: 0.9,
-            metalness: 0.1
-        });
-        this.basket = new THREE.Mesh(basketGeometry, basketMaterial);
-        this.basket.position.copy(this.position);
-        this.basket.position.y += 0.85;
-        this.basket.position.z -= 0.8;
-        this.basket.castShadow = true;
-        this.scene.add(this.basket);
-        
-        // Create the counterweight
-        const counterweightGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-        const counterweightMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x333333,
-            roughness: 0.6,
-            metalness: 0.7
-        });
-        this.counterweight = new THREE.Mesh(counterweightGeometry, counterweightMaterial);
-        this.counterweight.position.copy(this.position);
-        this.counterweight.position.y += 0.7;
-        this.counterweight.position.z += 1;
-        this.counterweight.castShadow = true;
-        this.scene.add(this.counterweight);
-        
-        // Set the entire catapult as the interactive mesh
-        this.mesh = this.base;
-        this.mesh.userData.interactive = true;
-        this.mesh.userData.parent = this;
-    }
-    
-    loadStone(stone) {
-        if (this.isReady && !this.loadedStone) {
-            this.loadedStone = stone;
+      
+    load(gltfLoader) {
+        // Gerçek GLTF model yükleme işlemi
+        gltfLoader.load('./models/catapult.glb', (gltf) => {
+            this.model = gltf.scene;
+            this.model.position.copy(this.position);
+            this.model.rotation.y = this.angle; // Açı artık constructor'da Math.PI olarak ayarlandı
+            this.model.scale.set(0.8, 0.8, 0.8); // Scale according to your needs
             
-            // Move stone to the basket
-            stone.mesh.position.copy(this.basket.position);
-            stone.mesh.position.y += 0.3;
-            
-            // Reset arm rotation to loaded position
-            this.arm.rotation.x = -Math.PI / 6;
-            
-            this.isReady = false;
-        }
-    }
-    
-    launch() {
-        if (this.loadedStone) {
-            // Animate the catapult arm
-            const initialRotation = this.arm.rotation.x;
-            const targetRotation = Math.PI / 3;
-            const duration = 500; // milliseconds
-            const startTime = Date.now();
-            
-            const animateArm = () => {
-                const elapsedTime = Date.now() - startTime;
-                const progress = Math.min(elapsedTime / duration, 1);
-                
-                // Ease function for smooth motion
-                const easeProgress = 1 - Math.cos((progress * Math.PI) / 2);
-                
-                this.arm.rotation.x = initialRotation + (targetRotation - initialRotation) * easeProgress;
-                
-                if (progress < 1) {
-                    requestAnimationFrame(animateArm);
-                } else {
-                    // Launch the stone when animation completes
-                    this.launchStone();
-                    
-                    // Reset the arm after a delay
-                    setTimeout(() => {
-                        this.arm.rotation.x = Math.PI / 12;
-                        this.isReady = true;
-                    }, 1000);
+            // Traverse all child objects to set shadows
+            this.model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
                 }
-            };
+                
+                // Find catapult parts for animation
+                if (child.name.includes('base')) {
+                    this.base = child;
+                } else if (child.name.includes('arm')) {
+                    this.arm = child;
+                } else if (child.name.includes('bucket')) {
+                    this.bucket = child;
+                }
+            });
             
-            animateArm();
-        }
+            // If model doesn't have named parts, create them for animation purposes
+            if (!this.arm) {
+                // Create a simple arm and bucket for testing
+                const armGeometry = new THREE.BoxGeometry(0.2, 2, 0.2);
+                const armMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                this.arm = new THREE.Mesh(armGeometry, armMaterial);
+                this.arm.position.y = 0.5;
+                this.model.add(this.arm);
+                
+                const bucketGeometry = new THREE.BoxGeometry(0.4, 0.2, 0.4);
+                const bucketMaterial = new THREE.MeshStandardMaterial({ color: 0x5D4037 });
+                this.bucket = new THREE.Mesh(bucketGeometry, bucketMaterial);
+                this.bucket.position.y = 1.5;
+                this.arm.add(this.bucket);
+            }
+              
+            this.scene.add(this.model); // Fixed: using add instead of addObject
+            this.loaded = true;
+        }, undefined, (error) => {
+            console.error('Mancınık modeli yüklenirken hata oluştu:', error);
+            
+            // Error case: Use a simple model instead
+            const geometry = new THREE.BoxGeometry(2, 1, 3);
+            const material = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            this.model = new THREE.Mesh(geometry, material);
+            this.model.position.copy(this.position);
+            this.model.castShadow = true;
+            
+            // Create simple arm and bucket
+            const armGeometry = new THREE.BoxGeometry(0.2, 2, 0.2);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            this.arm = new THREE.Mesh(armGeometry, armMaterial);
+            this.arm.position.set(0, 0.5, -1);
+            this.arm.rotation.x = -Math.PI / 4; // Default arm position
+            this.model.add(this.arm);
+            
+            const bucketGeometry = new THREE.BoxGeometry(0.4, 0.2, 0.4);
+            const bucketMaterial = new THREE.MeshStandardMaterial({ color: 0x5D4037 });
+            this.bucket = new THREE.Mesh(bucketGeometry, bucketMaterial);
+            this.bucket.position.y = 1;
+            this.arm.add(this.bucket);
+            
+            this.scene.add(this.model); // Fixed: using add instead of addObject
+            this.loaded = true;
+        });
     }
     
-    launchStone() {
-        const stone = this.loadedStone;
+    update(deltaTime) {
+        if (!this.loaded) return;
         
-        if (stone) {
-            // Calculate launch direction
-            const direction = new THREE.Vector3(0, 1, -1);
-            direction.normalize();
+        if (this.charging) {
+            this.power = Math.min(this.power + 30 * deltaTime, this.maxPower);
             
-            // Apply launch force
-            stone.velocity.copy(direction).multiplyScalar(this.launchForce);
-            stone.isLaunched = true;
-            
-            // Clear loaded stone
-            this.loadedStone = null;
+            // Pull back arm while charging
+            if (this.arm) {
+                this.arm.rotation.x = Math.max(-Math.PI / 2, -Math.PI / 4 - (this.power / this.maxPower) * Math.PI / 4);
+            }
         }
+        
+        // Animate firing
+        if (this.animating) {
+            this.animationTime += deltaTime * 3; // Animation speed
+            
+            if (this.animationTime <= 1) {
+                // Forward arm movement
+                if (this.arm) {
+                    this.arm.rotation.x = -Math.PI / 2 + this.animationTime * Math.PI / 2;
+                }
+            } else {
+                this.animating = false;
+                this.animationTime = 0;
+                
+                // Reset arm position
+                if (this.arm) {
+                    this.arm.rotation.x = -Math.PI / 4;
+                }
+            }
+        }
+        
+        // Update model position and rotation
+        this.model.position.copy(this.position);
+        this.model.rotation.y = this.angle;
     }
     
-    update() {
-        // Any continuous updates for the catapult
+    rotate(direction) {
+        this.angle += direction * 0.02;
+    }
+    
+    startCharging() {
+        this.charging = true;
+        this.power = 20;
+    }
+    
+    fire() {
+        if (!this.charging) return null;
+        
+        this.charging = false;
+        this.animating = true;
+        this.animationTime = 0;
+        
+        const stone = new Stone(this.scene);
+        
+        // Calculate firing direction based on catapult angle
+        const direction = new THREE.Vector3(
+            Math.sin(this.angle),
+            0.5,
+            Math.cos(this.angle)
+        ).normalize();
+        
+        // Set stone position at the bucket
+        const bucketWorldPos = new THREE.Vector3();
+        if (this.bucket) {
+            this.bucket.getWorldPosition(bucketWorldPos);
+            stone.position.copy(bucketWorldPos);
+        } else {
+            stone.position.copy(this.position).add(direction.clone().multiplyScalar(2).setY(1));
+        }
+        
+        // Set velocity based on power and direction
+        stone.velocity.copy(direction).multiplyScalar(this.power);
+        
+        stone.load();
+        return stone;
     }
 }
 
-export class Stone extends InteractiveObject {
-    constructor(scene, position) {
-        super(scene, position);
-        this.isLaunched = false;
+export class Stone {
+    constructor(scene) {
+        this.scene = scene;
+        this.mesh = null; // Renamed from model for consistency
+        this.position = new THREE.Vector3();
         this.velocity = new THREE.Vector3();
-        this.gravity = new THREE.Vector3(0, -9.8, 0);
-        this.mass = 1;
-        this.radius = 0.3;
-        this.bounceFactor = 0.5;
-        
-        this.createStone();
+        this.radius = 0.3; // Daha küçük taş yarıçapı
+        this.lifetime = 10; // Seconds before despawning
+        this.active = true;
     }
     
-    createStone() {
-        // Create a stone mesh
-        const geometry = new THREE.SphereGeometry(this.radius, 16, 16);
-        const material = new THREE.MeshStandardMaterial({ 
-            color: 0x666666,
-            roughness: 0.9,
-            metalness: 0.1
+    load() {
+        // GLTF model yüklemeyi dene
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.load('./models/stone.glb', (gltf) => {
+            this.mesh = gltf.scene;
+            this.mesh.position.copy(this.position);
+            this.mesh.scale.set(0.2, 0.2, 0.2); // Boyutu küçült
+            
+            this.mesh.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            
+            this.scene.add(this.mesh); // Fixed: using add instead of addObject
+        }, undefined, (error) => {
+            // Yüklenemezse basit küreyi kullan
+            console.error("Taş modeli yüklenirken hata:", error);
+            const geometry = new THREE.SphereGeometry(this.radius, 16, 16);
+            const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+            this.mesh = new THREE.Mesh(geometry, material);
+            this.mesh.position.copy(this.position);
+            this.mesh.castShadow = true;
+            this.scene.add(this.mesh); // Fixed: using add instead of addObject
         });
-        
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.copy(this.position);
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
-        this.scene.add(this.mesh);
-        
-        this.mesh.userData.interactive = true;
-        this.mesh.userData.parent = this;
     }
     
-    updatePhysics() {
-        if (!this.isLaunched) return;
+    update(deltaTime) {
+        if (!this.mesh) return;
         
         // Apply gravity
-        this.velocity.add(this.gravity.clone().multiplyScalar(0.016)); // Assuming 60fps
+        this.velocity.add(this.scene.gravity.clone().multiplyScalar(deltaTime));
         
         // Update position
-        this.mesh.position.add(this.velocity.clone().multiplyScalar(0.016)); // Assuming 60fps
+        this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+        this.mesh.position.copy(this.position);
         
-        // Ground collision
-        if (this.mesh.position.y < this.radius) {
-            this.mesh.position.y = this.radius;
-            this.velocity.y = -this.velocity.y * this.bounceFactor;
-            
-            // Apply friction to horizontal movement
+        // Decrease lifetime
+        this.lifetime -= deltaTime;
+        if (this.lifetime <= 0) {
+            this.remove();
+        }
+        
+        // Check for ground collision
+        if (this.position.y <= this.radius) {
+            this.position.y = this.radius;
+            this.velocity.y *= -0.5; // Bounce with damping
             this.velocity.x *= 0.9;
             this.velocity.z *= 0.9;
             
-            // Stop if moving very slowly
-            if (this.velocity.length() < 0.5) {
+            // If velocity is very low, stop movement
+            if (this.velocity.length() < 1) {
                 this.velocity.set(0, 0, 0);
-                this.isLaunched = false;
             }
+        }
+        
+        // Check collision with other objects
+        const collider = this.scene.checkCollisions(this);
+        if (collider) {
+            // Handle collision
+            this.handleCollision(collider);
         }
     }
     
-    reset() {
-        this.isLaunched = false;
-        this.velocity.set(0, 0, 0);
-        this.mesh.position.copy(this.position);
+    handleCollision(collider) {
+        // Simple collision response
+        const direction = new THREE.Vector3().subVectors(this.position, collider.position).normalize();
+        this.velocity.reflect(direction);
+        this.velocity.multiplyScalar(0.7); // Reduce velocity after collision
+        
+        // Move away from collision to prevent sticking
+        const separation = this.radius + collider.radius - this.position.distanceTo(collider.position);
+        if (separation > 0) {
+            this.position.add(direction.multiplyScalar(separation));
+        }
     }
     
-    update() {
-        // This is called by the main loop - physics update is handled separately
+    remove() {
+        if (!this.active) return;
+        
+        this.active = false;
+        if (this.mesh) {
+            this.scene.remove(this.mesh); // Fixed: using remove instead of removeObject
+            this.mesh = null;
+        }
     }
 }
 
-export class Torch extends InteractiveObject {
+export class Torch {
     constructor(scene, position) {
-        super(scene, position);
-        this.isLit = false;
-        this.baseIntensity = 1.0;
-        
-        this.createTorch();
+        this.scene = scene;
+        this.position = position.clone();
+        this.model = null;
+        this.light = null;
+        this.flame = null;
+        this.intensity = 4; // Meşale ışığını artır
+        this.color = 0xff6a00;
+        this.flickerSpeed = 0.5;
+        this.flickerIntensity = 0.2;
+        this.time = Math.random() * 1000; // Random start time for varied flickering
     }
     
-    createTorch() {
-        // Create torch handle
-        const handleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8);
-        const handleMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x5c3a21,
-            roughness: 0.8,
-            metalness: 0.1
+    load() {
+        // GLTF model yüklemeyi dene
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.load('./models/torch.glb', (gltf) => {            
+            this.model = gltf.scene;
+            this.model.position.copy(this.position);
+            this.model.scale.set(0.1, 0.1, 0.1); // Boyutu çok daha küçük ayarla
+            
+            this.model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            
+            this.addLight();
+            
+            this.scene.add(this.model); // Fixed: using add instead of addObject
+        }, undefined, (error) => {
+            // Model yüklenemezse basit bir meşale oluştur
+            console.error("Meşale modeli yüklenirken hata:", error);
+              
+            // Meşale gövdesi - daha küçük
+            const torchGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8);
+            const torchMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            this.model = new THREE.Mesh(torchGeometry, torchMaterial);
+            this.model.position.copy(this.position);
+            this.model.castShadow = true;
+            
+            // Alev - daha küçük
+            const flameGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+            const flameMaterial = new THREE.MeshBasicMaterial({ 
+                color: this.color,
+                transparent: true,
+                opacity: 0.8
+            });
+            this.flame = new THREE.Mesh(flameGeometry, flameMaterial);
+            this.flame.position.y = 0.2;
+            this.model.add(this.flame);
+              
+            // Işık
+            this.light = new THREE.PointLight(this.color, this.intensity, 5);
+            this.light.position.y = 0.2;
+            this.light.castShadow = true;
+            this.model.add(this.light);
+            
+            this.scene.add(this.model); // Fixed: using add instead of addObject
         });
+    }
+      
+    update(deltaTime) {
+        if (!this.model) return;
         
-        this.handle = new THREE.Mesh(handleGeometry, handleMaterial);
-        this.handle.position.copy(this.position);
-        this.handle.castShadow = true;
-        this.scene.add(this.handle);
+        // Update time for flickering effect
+        this.time += deltaTime;
         
-        // Create torch head
-        const headGeometry = new THREE.CylinderGeometry(0.1, 0.08, 0.2, 8);
-        const headMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x2c2c2c,
-            roughness: 0.9,
-            metalness: 0.1
-        });
+        // Calculate flicker based on noise
+        const flicker = Math.sin(this.time * this.flickerSpeed) * this.flickerIntensity;
         
-        this.head = new THREE.Mesh(headGeometry, headMaterial);
-        this.head.position.copy(this.position);
-        this.head.position.y += 0.4;
-        this.head.castShadow = true;
-        this.scene.add(this.head);
+        // Apply flicker to light intensity if light exists
+        if (this.light) {
+            this.light.intensity = this.intensity * (1 + flicker);
+        }
         
-        // Create flame (initially invisible)
-        const flameGeometry = new THREE.ConeGeometry(0.12, 0.3, 8);
+        // Apply flicker to flame size if flame exists
+        if (this.flame) {
+            const scale = 1 + flicker * 0.5;
+            this.flame.scale.set(scale, scale, scale);
+        }
+    }
+    
+    setIntensity(value) {
+        this.intensity = value;
+        if (this.light) {
+            this.light.intensity = value;
+        }
+    }
+    
+    // Meşaleye ışık ekleyen yardımcı metod - AssetLoader ile kullanılır
+    addLight() {
+        if (!this.model) {
+            console.error("Meşale modeli hazır değil, ışık eklenemedi");
+            return;
+        }
+        
+        // Işık oluştur
+        this.light = new THREE.PointLight(this.color, this.intensity, 5); // Daha küçük mesafe
+        this.light.position.y = 0.3; // Işığı daha altta konumlandır
+        this.light.castShadow = true; // Gölge oluştur
+        this.model.add(this.light);
+        
+        // Alev efekti için
+        const flameGeometry = new THREE.SphereGeometry(0.05, 8, 8); // Daha küçük alev
         const flameMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff9900,
+            color: this.color,
             transparent: true,
             opacity: 0.8
         });
-        
         this.flame = new THREE.Mesh(flameGeometry, flameMaterial);
-        this.flame.position.copy(this.position);
-        this.flame.position.y += 0.65;
-        this.flame.visible = false;
-        this.scene.add(this.flame);
+        this.flame.position.y = 0.3; // Alevin pozisyonu
+        this.model.add(this.flame);
         
-        // Create light (initially invisible)
-        this.light = new THREE.PointLight(0xff9900, this.baseIntensity, 5);
-        this.light.position.copy(this.position);
-        this.light.position.y += 0.65;
-        this.light.visible = false;
-        this.light.castShadow = true;
-        
-        // Configure shadow properties
-        this.light.shadow.mapSize.width = 512;
-        this.light.shadow.mapSize.height = 512;
-        this.light.shadow.camera.near = 0.1;
-        this.light.shadow.camera.far = 10;
-        
-        this.scene.add(this.light);
-        
-        // Set the handle as the interactive mesh
-        this.mesh = this.handle;
-        this.mesh.userData.interactive = true;
-        this.mesh.userData.parent = this;
+        console.log("Meşale ışığı ve alev efekti eklendi:", this.position);
     }
     
+    // Toggle the torch on/off
     toggle() {
-        this.isLit = !this.isLit;
-        this.flame.visible = this.isLit;
-        this.light.visible = this.isLit;
-    }
-    
-    setIntensity(intensity) {
-        this.baseIntensity = intensity;
-        if (this.light) {
-            this.light.intensity = intensity;
+        if (!this.light) return false;
+        
+        const wasLit = this.light.intensity > 0;
+        this.light.intensity = wasLit ? 0 : this.intensity;
+        
+        if (this.flame) {
+            this.flame.visible = !wasLit;
         }
-    }
-    
-    animateFlame() {
-        if (!this.isLit) return;
         
-        // Add subtle movement to the flame
-        const time = Date.now() * 0.003;
-        
-        // Scale the flame slightly
-        const scaleX = 1.0 + Math.sin(time * 1.5) * 0.1;
-        const scaleY = 1.0 + Math.cos(time) * 0.1;
-        const scaleZ = 1.0 + Math.sin(time + 0.5) * 0.1;
-        
-        this.flame.scale.set(scaleX, scaleY, scaleZ);
-        
-        // Subtle light intensity fluctuation
-        if (this.light) {
-            this.light.intensity = this.baseIntensity * (0.9 + Math.sin(time * 2) * 0.1);
-        }
-    }
-    
-    update() {
-        // Animation is handled separately in animateFlame
+        return wasLit;
     }
 }
