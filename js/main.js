@@ -2,332 +2,472 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SceneManager } from './scene.js';
-import { PlayerControls } from './controls.js';
 import { Catapult, Stone, Torch } from './objects.js';
-import { LightingManager } from './lighting.js';
 
-class MedievalCastleApp {
+// Ana uygulama sınıfı
+class App {
     constructor() {
-        // Scene setup
-        this.canvas = document.createElement('canvas');
-        document.body.appendChild(this.canvas);
+        // DOM elementlerine erişim
+        this.loadingElement = document.getElementById('loading');
+        this.scoreElement = document.getElementById('score');
+        this.dayNightToggle = document.getElementById('day-night-toggle');
         
-        // Renderer
-        this.renderer = new THREE.WebGLRenderer({ 
-            canvas: this.canvas,
-            antialias: true 
+        // Three.js bileşenleri
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.controls = null;
+        this.sceneManager = null;
+        
+        // Kullanıcı girdisi
+        this.keys = {};
+        
+        // Zaman takibi
+        this.clock = new THREE.Clock();
+        this.deltaTime = 0;
+        
+        // Işık ve gökyüzü ayarları
+        this.isDay = true;
+        this.gui = null;
+        
+        // Kaynaklar
+        this.resources = {
+            models: {},
+            textures: {}
+        };
+        
+        // Başlatma
+        this.init();
+    }
+    
+    init() {
+        // Renderer oluşturma
+        this.renderer = new THREE.WebGLRenderer({
+            canvas: document.getElementById('scene-canvas'),
+            antialias: true
         });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         
-        // Camera
+        // Kamera oluşturma
         this.camera = new THREE.PerspectiveCamera(
             75, 
-            window.innerWidth / window.innerHeight, 
-            0.1, 
+            window.innerWidth / window.innerHeight,
+            0.1,
             1000
         );
-        this.camera.position.set(5, 2, 10);
         
-        // Scene manager
-        this.sceneManager = new SceneManager(this.renderer, this.camera);
-        
-        // Lighting
-        this.lightingManager = new LightingManager(this.sceneManager.scene);
-        
-        // Controls
+        // Kontroller oluşturma
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
+        this.controls.maxPolarAngle = Math.PI / 2 - 0.1; // Yerden geçmemesi için sınırlama
         
-        // Game state
-        this.score = 0;
-        this.scoreElement = document.getElementById('score');
-        this.isNightMode = false;
-        this.torchBrightness = 1.0;
+        // Scene Manager oluşturma
+        this.sceneManager = new SceneManager(this.renderer, this.camera);
+          // Reset fonksiyonu - tüm sahneyi temizler ve yeniden oluşturur
+        window.resetScene = async () => {
+            console.log("Sahne sıfırlanıyor...");
+            
+            // AssetLoader'ı temizle ve sıfırla
+            try {
+                const { assetLoader } = await import('./AssetLoader.js');
+                console.log("Asset önbelleği temizleniyor...");
+                assetLoader.clearCache();
+            } catch (error) {
+                console.warn("AssetLoader temizlenemedi:", error);
+            }
+            
+            // Eski SceneManager'ı temizle
+            if (this.sceneManager && this.sceneManager.scene) {
+                console.log("SceneManager temizleniyor...");
+                this.sceneManager.cleanupScene();
+            }
+            
+            // Eski SceneManager'ı yok et
+            this.sceneManager = null;
+            
+            // Yeni bir SceneManager oluştur
+            console.log("Yeni SceneManager oluşturuluyor...");
+            this.sceneManager = new SceneManager(this.renderer, this.camera);
+            
+            console.log("Sahne sıfırlandı");
+            
+            // Score'u sıfırla
+            this.score = 0;
+            if (this.scoreElement) {
+                this.scoreElement.textContent = "0";
+            }
+        };
         
-        // Object collections
-        this.interactiveObjects = [];
-        this.torches = [];
-        this.stones = [];
+        // Olay dinleyiciler
+        window.addEventListener('resize', this.onWindowResize.bind(this), false);
+        window.addEventListener('keydown', (e) => { this.keys[e.code] = true; });
+        window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
+        this.dayNightToggle.addEventListener('click', this.toggleDayNight.bind(this));
         
-        // Setup event listeners
-        this.setupEventListeners();
+        // GUI oluşturma
+        this.setupGUI();
         
-        // Initialize loading manager
-        this.initLoadingManager();
+        // Modelleri yükle
+        this.loadModels();
         
-        // Start animation loop
+        // Animasyon döngüsünü başlat
         this.animate();
     }
     
-    initLoadingManager() {
-        this.loadingManager = new THREE.LoadingManager();
-        this.progressBar = document.querySelector('.progress-bar');
-        this.loadingScreen = document.getElementById('loading-screen');
+    setupGUI() {
+        this.gui = new dat.GUI();
         
-        this.loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-            const progress = itemsLoaded / itemsTotal * 100;
-            this.progressBar.style.width = progress + '%';
+        // Işık ayarları
+        const lightFolder = this.gui.addFolder('Işık Ayarları');
+        const lightSettings = {
+            meşaleParlaklığı: 2,
+            ambientIntensity: 0.5
         };
         
-        this.loadingManager.onLoad = () => {
-            setTimeout(() => {
-                this.loadingScreen.style.display = 'none';
-            }, 500);
+        lightFolder.add(lightSettings, 'meşaleParlaklığı', 0, 5).onChange((value) => {
+            // Tüm meşaleleri güncelle
+            if (this.sceneManager.objects.torches) {
+                this.sceneManager.objects.torches.forEach(torch => {
+                    torch.setIntensity(value);
+                });
+            }
+        });
+        
+        lightFolder.add(lightSettings, 'ambientIntensity', 0, 1).onChange((value) => {
+            if (this.sceneManager.scene.ambientLight) {
+                this.sceneManager.scene.ambientLight.intensity = value;
+            }
+        });
+        
+        lightFolder.open();
+        
+        // Mancınık ayarları
+        const catapultFolder = this.gui.addFolder('Mancınık Ayarları');
+        const catapultSettings = {
+            maxPower: 100
         };
         
-        // Initialize assets loading
-        this.loadAssets();
-    }
-    
-    loadAssets() {
-        // Load textures, models, etc.
-        this.textureLoader = new THREE.TextureLoader(this.loadingManager);
-        this.gltfLoader = new GLTFLoader(this.loadingManager);
-        
-        // Load castle components
-        this.loadCastle();
-        
-        // Create basic environment
-        this.createEnvironment();
-        
-        // Create interactive objects (catapult, torches, stones)
-        this.createInteractiveObjects();
-    }
-    
-    loadCastle() {
-        // For now, we'll create a simple castle with basic geometries
-        // In a real project, you would load GLTF models here
-        
-        // Create castle walls
-        const wallGeometry = new THREE.BoxGeometry(10, 5, 1);
-        const wallMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x888888,
-            roughness: 0.7,
-            metalness: 0.2
+        catapultFolder.add(catapultSettings, 'maxPower', 50, 200).onChange((value) => {
+            if (this.sceneManager.objects.catapult) {
+                this.sceneManager.objects.catapult.maxPower = value;
+            }
         });
         
-        // Front wall
-        const frontWall = new THREE.Mesh(wallGeometry, wallMaterial);
-        frontWall.position.set(0, 2.5, -5);
-        frontWall.castShadow = true;
-        frontWall.receiveShadow = true;
-        this.sceneManager.scene.add(frontWall);
-        
-        // Back wall
-        const backWall = new THREE.Mesh(wallGeometry, wallMaterial);
-        backWall.position.set(0, 2.5, 5);
-        backWall.castShadow = true;
-        backWall.receiveShadow = true;
-        this.sceneManager.scene.add(backWall);
-        
-        // Left wall
-        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1, 5, 10), wallMaterial);
-        leftWall.position.set(-5, 2.5, 0);
-        leftWall.castShadow = true;
-        leftWall.receiveShadow = true;
-        this.sceneManager.scene.add(leftWall);
-        
-        // Right wall
-        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(1, 5, 10), wallMaterial);
-        rightWall.position.set(5, 2.5, 0);
-        rightWall.castShadow = true;
-        rightWall.receiveShadow = true;
-        this.sceneManager.scene.add(rightWall);
-        
-        // Create towers at each corner
-        const towerGeometry = new THREE.CylinderGeometry(1, 1.2, 7, 8);
-        const towerMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x777777,
-            roughness: 0.8,
-            metalness: 0.1
-        });
-        
-        const createTower = (x, z) => {
-            const tower = new THREE.Mesh(towerGeometry, towerMaterial);
-            tower.position.set(x, 3.5, z);
-            tower.castShadow = true;
-            tower.receiveShadow = true;
-            this.sceneManager.scene.add(tower);
+        // Kamera ayarları
+        const cameraFolder = this.gui.addFolder('Kamera Ayarları');
+        const cameraSettings = {
+            speed: 5
         };
         
-        // Create towers at the four corners
-        createTower(-5, -5);
-        createTower(5, -5);
-        createTower(-5, 5);
-        createTower(5, 5);
-    }
-    
-    createEnvironment() {
-        // Create ground
-        const groundGeometry = new THREE.PlaneGeometry(100, 100);
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x3a7d44,
-            roughness: 0.9,
-            metalness: 0.0
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        ground.position.y = 0;
-        ground.receiveShadow = true;
-        this.sceneManager.scene.add(ground);
-        
-        // Create skybox (simple color for now)
-        this.sceneManager.scene.background = new THREE.Color(0x87ceeb); // Sky blue
-    }
-    
-    createInteractiveObjects() {
-        // Create catapult
-        this.catapult = new Catapult(this.sceneManager.scene, new THREE.Vector3(0, 0.5, -3));
-        this.interactiveObjects.push(this.catapult);
-        
-        // Create stones for the catapult
-        for (let i = 0; i < 5; i++) {
-            const stone = new Stone(this.sceneManager.scene, new THREE.Vector3(2 + i * 0.5, 0.5, -3));
-            this.stones.push(stone);
-            this.interactiveObjects.push(stone);
+        cameraFolder.add(cameraSettings, 'speed', 1, 10);
+    }    async loadModels() {
+        // Yükleme ekranını göster
+        if (this.loadingElement) {
+            this.loadingElement.style.display = 'block';
         }
         
-        // Create torches
+        try {
+            // AssetLoader'ı içe aktar
+            const { assetLoader } = await import('./AssetLoader.js');
+            
+            // Tüm modelleri önceden yükle
+            console.log("Tüm modeller AssetLoader ile yükleniyor...");
+            await assetLoader.preloadAllModels();
+            
+            // Scene Manager aracılığıyla sahneyi yükle
+            await this.sceneManager.loadCastle();
+            
+            // Mancınık model yükleme ve yerleştirme
+            this.sceneManager.objects.catapult = new Catapult(this.sceneManager);
+            
+            // Modelleri AssetLoader kullanarak yükle
+            if (assetLoader.assets['catapult']) {
+                this.sceneManager.objects.catapult.model = assetLoader.getModelCopy('catapult');
+                this.sceneManager.scene.add(this.sceneManager.objects.catapult.model);
+                this.sceneManager.objects.catapult.loaded = true;
+                console.log("Mancınık modeli AssetLoader'dan yüklendi");
+            } else {
+                // Yüklenemezse normal yöntemle yükle
+                console.log("Mancınık modelinin normal yüklemesi başlatılıyor...");
+                const loader = new GLTFLoader();
+                this.sceneManager.objects.catapult.load(loader);
+            }
+            
+            // Meşale modellerini oluştur
+            this.sceneManager.objects.torches = [];
+            const torchPositions = [
+                new THREE.Vector3(5, 0, 5),
+                new THREE.Vector3(-5, 0, 5),
+                new THREE.Vector3(5, 0, -5),
+                new THREE.Vector3(-5, 0, -5)
+            ];
+            
+            torchPositions.forEach(position => {
+                const torch = new Torch(this.sceneManager, position);
+                
+                // AssetLoader ile yüklemeyi dene
+                if (assetLoader.assets['torch']) {
+                    torch.model = assetLoader.getModelCopy('torch');
+                    torch.model.position.copy(position);
+                    torch.model.scale.set(assetLoader.TORCH_SCALE, assetLoader.TORCH_SCALE, assetLoader.TORCH_SCALE);
+                    this.sceneManager.scene.add(torch.model);
+                    torch.loaded = true;
+                } else {
+                    // Normal yükleme
+                    torch.load();
+                }
+                
+                this.sceneManager.objects.torches.push(torch);
+            });
+            
+            // Taş modelini test için yükleyelim - kalenin dışına yerleştir
+            const stone = new Stone(this.sceneManager);
+            stone.position.set(10, 1, 10); // Kale dışında bir pozisyon
+            stone.radius = 0.5; // Taşın boyutunu küçült
+            
+            // AssetLoader ile yüklemeyi dene
+            if (assetLoader.assets['stone']) {
+                stone.mesh = assetLoader.getModelCopy('stone');
+                stone.mesh.position.copy(stone.position);
+                stone.mesh.scale.set(assetLoader.STONE_SCALE, assetLoader.STONE_SCALE, assetLoader.STONE_SCALE);
+                this.sceneManager.scene.add(stone.mesh);
+                stone.loaded = true;
+            } else {
+                // Normal yükleme
+                stone.load();
+            }
+            
+            // Yükleme tamamlandı, ekranı gizle
+            if (this.loadingElement) {
+                this.loadingElement.style.display = 'none';
+            }
+        } catch (error) {
+            console.error("Model yükleme hatası:", error);
+            
+            // Hata durumunda eski yöntemle yükleyelim
+            console.log("Klasik yüklemeye geçiliyor...");
+            this.loadModelsLegacy();
+        }
+    }
+    
+    // Eski yöntem model yükleme (AssetLoader çalışmazsa)
+    loadModelsLegacy() {
+        console.log("Modeller klasik yöntemle yükleniyor...");
+        
+        const gltfLoader = new GLTFLoader();
+        let totalModels = 4; // kale, mancınık, taş, meşale
+        let loadedModels = 0;
+        
+        // Yükleme tamamlandığında kontrol
+        const checkLoaded = () => {
+            loadedModels++;
+            if (loadedModels >= totalModels) {
+                if (this.loadingElement) {
+                    this.loadingElement.style.display = 'none';
+                }
+            }
+        };
+        
+        // Kale modelini yükle
+        gltfLoader.load('./models/castle.glb', (gltf) => {
+            const castle = gltf.scene;
+            castle.name = "castle";
+            castle.userData.type = "castle";
+            
+            // Kale ölçeğini sabit olarak ayarla
+            castle.scale.set(0.08, 0.08, 0.08);
+            castle.position.set(0, 0, 0);
+            
+            castle.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            
+            // Varsa önceki kaleyi kaldır
+            if (this.sceneManager.objects.castle) {
+                this.sceneManager.scene.remove(this.sceneManager.objects.castle);
+            }
+            
+            this.sceneManager.objects.castle = castle;
+            this.sceneManager.scene.add(castle);
+            
+            checkLoaded();
+        }, undefined, (error) => {
+            console.error('Kale modeli yüklenirken hata oluştu:', error);
+            checkLoaded();
+        });
+        
+        // Mancınık modelini yükle
+        this.sceneManager.objects.catapult = new Catapult(this.sceneManager);
+        this.sceneManager.objects.catapult.load(gltfLoader);
+        checkLoaded();
+        
+        // Meşale modellerini oluştur
+        this.sceneManager.objects.torches = [];
         const torchPositions = [
-            new THREE.Vector3(-4, 3, -4.5),
-            new THREE.Vector3(4, 3, -4.5),
-            new THREE.Vector3(-4, 3, 4.5),
-            new THREE.Vector3(4, 3, 4.5)
+            new THREE.Vector3(5, 0, 5),
+            new THREE.Vector3(-5, 0, 5),
+            new THREE.Vector3(5, 0, -5),
+            new THREE.Vector3(-5, 0, -5)
         ];
         
         torchPositions.forEach(position => {
-            const torch = new Torch(this.sceneManager.scene, position);
-            this.torches.push(torch);
-            this.interactiveObjects.push(torch);
+            const torch = new Torch(this.sceneManager, position);
+            torch.load();
+            this.sceneManager.objects.torches.push(torch);
         });
+        checkLoaded();
+        
+        // Taş modelini test için yükleyelim
+        const stone = new Stone(this.sceneManager);
+        stone.position.set(10, 1, 10);
+        stone.radius = 0.5;
+        stone.load();
+        checkLoaded();
     }
     
-    setupEventListeners() {
-        // Resize handler
-        window.addEventListener('resize', () => {
-            this.camera.aspect = window.innerWidth / window.innerHeight;
-            this.camera.updateProjectionMatrix();
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-        
-        // Day/Night toggle
-        document.getElementById('toggle-day-night').addEventListener('click', () => {
-            this.isNightMode = !this.isNightMode;
-            this.lightingManager.toggleDayNight(this.isNightMode);
-            
-            // Update active torches
-            this.torches.forEach(torch => {
-                if (this.isNightMode && torch.isLit) {
-                    torch.flame.visible = true;
-                    torch.light.visible = true;
-                } else if (!this.isNightMode) {
-                    torch.flame.visible = false;
-                    torch.light.visible = false;
-                }
-            });
-        });
-        
-        // Torch brightness control
-        document.getElementById('torch-brightness').addEventListener('input', (e) => {
-            this.torchBrightness = parseFloat(e.target.value);
-            this.torches.forEach(torch => {
-                if (torch.light) {
-                    torch.setIntensity(this.torchBrightness);
-                }
-            });
-        });
-        
-        // Mouse click for interaction
-        this.renderer.domElement.addEventListener('click', (event) => {
-            const mouse = new THREE.Vector2(
-                (event.clientX / window.innerWidth) * 2 - 1,
-                -(event.clientY / window.innerHeight) * 2 + 1
-            );
-            
-            this.handleInteraction(mouse);
-        });
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
-    
-    handleInteraction(mouse) {
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, this.camera);
+      toggleDayNight() {
+        this.isDay = !this.isDay;
         
-        // Collect all interactive meshes
-        const interactiveMeshes = this.interactiveObjects.map(obj => obj.mesh);
-        const intersects = raycaster.intersectObjects(interactiveMeshes);
-        
-        if (intersects.length > 0) {
-            const clickedMesh = intersects[0].object;
-            
-            // Find the corresponding interactive object
-            const clickedObject = this.interactiveObjects.find(obj => obj.mesh === clickedMesh);
-            
-            if (clickedObject) {
-                if (clickedObject instanceof Torch) {
-                    // Toggle torch
-                    clickedObject.toggle();
-                    
-                    // Update score
-                    if (clickedObject.isLit) {
-                        this.updateScore(5);
-                    } else {
-                        this.updateScore(-2);
-                    }
-                } else if (clickedObject instanceof Stone) {
-                    // Pick up stone if catapult is ready
-                    if (!this.catapult.loadedStone && !clickedObject.isLaunched) {
-                        this.catapult.loadStone(clickedObject);
-                        this.updateScore(2);
-                    }
-                } else if (clickedObject instanceof Catapult) {
-                    // Launch stone if one is loaded
-                    if (this.catapult.loadedStone) {
-                        this.catapult.launch();
-                        this.updateScore(10);
-                    }
-                }
+        if (this.isDay) {
+            // Gündüz ayarları
+            this.sceneManager.scene.background = new THREE.Color(0x87CEEB);
+            if (this.sceneManager.directionalLight) {
+                this.sceneManager.directionalLight.intensity = 0.8;
             }
+            if (this.sceneManager.ambientLight) {
+                this.sceneManager.ambientLight.intensity = 0.6;
+            }
+            // Meşale ışıklarını azalt
+            if (this.sceneManager.objects.torches) {
+                this.sceneManager.objects.torches.forEach(torch => {
+                    torch.setIntensity(2);
+                });
+            }
+            // Fog'u kaldır veya azalt
+            this.sceneManager.scene.fog = new THREE.FogExp2(0xcccccc, 0.005);
+            
+            this.dayNightToggle.textContent = "Geceye Geç";
+        } else {
+            // Gece ayarları
+            this.sceneManager.scene.background = new THREE.Color(0x000022);
+            if (this.sceneManager.directionalLight) {
+                this.sceneManager.directionalLight.intensity = 0.1;
+            }
+            if (this.sceneManager.ambientLight) {
+                this.sceneManager.ambientLight.intensity = 0.2;
+            }
+            // Meşale ışıklarını artır
+            if (this.sceneManager.objects.torches) {
+                this.sceneManager.objects.torches.forEach(torch => {
+                    torch.setIntensity(5);
+                });
+            }
+            // Sis ekle
+            this.sceneManager.scene.fog = new THREE.FogExp2(0x000022, 0.01);
+            
+            this.dayNightToggle.textContent = "Gündüze Geç";
         }
     }
     
-    updateScore(points) {
-        this.score += points;
-        this.scoreElement.textContent = this.score;
+    handleInput() {
+        // Mancınık kontrolü
+        const catapult = this.sceneManager.objects.catapult;
+        if (catapult) {
+            if (this.keys['ArrowLeft']) {
+                catapult.rotate(1);
+            }
+            if (this.keys['ArrowRight']) {
+                catapult.rotate(-1);
+            }
+            if (this.keys['Space'] && !this.spacePressed) {
+                this.spacePressed = true;
+                catapult.startCharging();
+            }
+            if (!this.keys['Space'] && this.spacePressed) {
+                this.spacePressed = false;
+                const stone = catapult.fire();
+                if (stone) {
+                    this.sceneManager.objects.stones.push(stone);
+                }
+            }
+        }
     }
     
     animate() {
         requestAnimationFrame(this.animate.bind(this));
         
-        // Update controls
+        this.deltaTime = this.clock.getDelta();
+        
+        // Kullanıcı girişini işle
+        this.handleInput();
+        
+        // Sahnedeki objeleri güncelle
+        if (this.sceneManager.objects.catapult) {
+            this.sceneManager.objects.catapult.update(this.deltaTime);
+        }
+        
+        // Taşları güncelle
+        if (this.sceneManager.objects.stones) {
+            for (let i = this.sceneManager.objects.stones.length - 1; i >= 0; i--) {
+                const stone = this.sceneManager.objects.stones[i];
+                stone.update(this.deltaTime);
+                if (!stone.active) {
+                    this.sceneManager.objects.stones.splice(i, 1);
+                }
+            }
+        }
+        
+        // Meşaleleri güncelle
+        if (this.sceneManager.objects.torches) {
+            this.sceneManager.objects.torches.forEach(torch => {
+                torch.update(this.deltaTime);
+            });
+        }
+        
+        // Kontrolleri güncelle
         this.controls.update();
         
-        // Update interactive objects
-        this.interactiveObjects.forEach(obj => obj.update());
-        
-        // Update physics for launched stones
-        this.stones.forEach(stone => {
-            if (stone.isLaunched) {
-                stone.updatePhysics();
-            }
-        });
-        
-        // Update animated torches
-        this.torches.forEach(torch => {
-            if (torch.isLit) {
-                torch.animateFlame();
-            }
-        });
-        
-        // Render scene
+        // Sahneyi render et
         this.renderer.render(this.sceneManager.scene, this.camera);
+    }
+    
+    updateScore(value) {
+        this.sceneManager.score += value;
+        this.scoreElement.textContent = this.sceneManager.score;
     }
 }
 
-// Initialize the application when the window is loaded
-window.addEventListener('load', () => {
-    new MedievalCastleApp();
+// Uygulamayı başlat
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("DOM yüklendi, uygulama başlatılıyor...");
+    
+    try {
+        // AssetLoader'ı ilk olarak yükle ve ön yükleme yap
+        const { assetLoader } = await import('./AssetLoader.js');
+        console.log("AssetLoader hazırlanıyor...");
+        
+        // Uygulamayı başlat
+        const app = new App();
+        
+        // Global resetScene referansını ata
+        if (!window.resetScene) {
+            console.log("Global resetScene fonksiyonu atanıyor");
+            window.resetScene = app.resetScene.bind(app);
+        }
+        
+        console.log("Uygulama başarıyla başlatıldı");
+    } catch (error) {
+        console.error("Uygulama başlatılırken hata oluştu:", error);
+    }
 });
