@@ -23,6 +23,10 @@ export class Catapult {
         this.base = null;
         this.arm = null;
         this.bucket = null;
+        
+        // Taş yükleme özellikleri
+        this.hasStone = false;
+        this.loadedStone = null;
     }
       
     load(gltfLoader) {
@@ -143,73 +147,71 @@ export class Catapult {
         this.power = 20;
     }
     
-    fire() {
-        if (!this.charging) return null;
-        
-        this.charging = false;
-        this.animating = true;
-        this.animationTime = 0;
-          // Calculate firing direction based on catapult angle
-        const direction = new THREE.Vector3(
-            Math.sin(this.angle),
-            0.5,
-            Math.cos(this.angle)
-        ).normalize();
-        
-        // Determine stone position
-        const bucketWorldPos = new THREE.Vector3();
-        let stonePosition;
-        
-        if (this.bucket) {
-            this.bucket.getWorldPosition(bucketWorldPos);
-            stonePosition = bucketWorldPos;
-        } else {
-            stonePosition = this.position.clone().add(direction.clone().multiplyScalar(2).setY(1));
+    loadStone(stone) {
+        if (!this.hasStone && stone && !stone.isLaunched) {
+            this.hasStone = true;
+            this.loadedStone = stone;
+            
+            // Taşı mancınığın kovasına yerleştir
+            if (this.bucket && stone.mesh) {
+                stone.mesh.position.copy(this.bucket.position);
+                stone.mesh.position.y += 0.2; // Kovadan biraz yukarıda
+            }
+            
+            return true;
         }
-        
-        // Pozisyon belirlendikten sonra taşı oluştur
-        const stone = new Stone(this.scene, stonePosition);
-        
-        // Set velocity based on power and direction
-        stone.velocity.copy(direction).multiplyScalar(this.power);
-        
-        stone.load();
-        return stone;
+        return false;
+    }
+    
+    launch() {
+        if (this.hasStone && this.loadedStone) {
+            const stone = this.loadedStone;
+            this.hasStone = false;
+            this.loadedStone = null;
+            
+            // Taşı fırlat
+            stone.isLaunched = true;
+            
+            // Mancınık animasyonunu başlat
+            this.animating = true;
+            this.animationTime = 0;
+            
+            return stone;
+        }
+        return null;
     }
 }
 
 export class Stone {
     constructor(scene, position) {
         this.scene = scene;
-        this.mesh = null; // Renamed from model for consistency
+        this.mesh = null;
         
-        // Eğer pozisyon belirtilmişse o pozisyonu kullan, belirtilmemişse boş vektör oluşturma
         if (position) {
             this.position = position.clone();
         } else {
-            // Pozisyon belirtilmemiş, varsayılan değer atama
             this.position = null;
         }
-          this.velocity = new THREE.Vector3();
-        this.radius = 0.25; // Daha küçük taş yarıçapı (0.3 -> 0.25)
-        this.lifetime = 10; // Seconds before despawning
+        
+        this.velocity = new THREE.Vector3();
+        this.radius = 0.5; // Yarıçapı artırdık (0.25 -> 0.5)
+        this.lifetime = 10;
         this.active = true;
-        this.isStatic = true; // Varsayılan olarak statik (yerçekiminden etkilenmez)
-        this.isLaunched = false; // Fırlatılıp fırlatılmadığı
+        this.isStatic = true;
+        this.isLaunched = false;
     }
-      load() {
-        // Eğer pozisyon değeri yoksa, bu taşı yükleme
+    
+    load() {
         if (!this.position) {
             console.log("Taş yüklenmedi: pozisyon belirtilmemiş");
             return;
         }
         
-        // GLTF model yüklemeyi dene
         const gltfLoader = new GLTFLoader();
         gltfLoader.load('./models/stone.glb', (gltf) => {
             this.mesh = gltf.scene;
             this.mesh.position.copy(this.position);
-            this.mesh.scale.set(0.2, 0.2, 0.2); // Boyutu küçült
+            this.mesh.scale.set(0.4, 0.4, 0.4); // Boyutu artırdık
             
             this.mesh.traverse((child) => {
                 if (child.isMesh) {
@@ -218,18 +220,23 @@ export class Stone {
                 }
             });
             
-            this.scene.add(this.mesh); // Fixed: using add instead of addObject
+            this.scene.add(this.mesh);
         }, undefined, (error) => {
-            // Yüklenemezse basit küreyi kullan
             console.error("Taş modeli yüklenirken hata:", error);
-            const geometry = new THREE.SphereGeometry(this.radius, 16, 16);
-            const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+            const geometry = new THREE.SphereGeometry(this.radius, 32, 32); // Daha detaylı küre
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0x888888,
+                roughness: 0.7,
+                metalness: 0.3
+            });
             this.mesh = new THREE.Mesh(geometry, material);
             this.mesh.position.copy(this.position);
             this.mesh.castShadow = true;
-            this.scene.add(this.mesh); // Fixed: using add instead of addObject
+            this.scene.add(this.mesh);
         });
-    }    update(deltaTime) {
+    }
+    
+    update(deltaTime) {
         // Eğer mesh yoksa veya pozisyon atanmamışsa işlem yapma
         if (!this.mesh || !this.position) return;
         
