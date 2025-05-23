@@ -149,24 +149,26 @@ export class Catapult {
         this.charging = false;
         this.animating = true;
         this.animationTime = 0;
-        
-        const stone = new Stone(this.scene);
-        
-        // Calculate firing direction based on catapult angle
+          // Calculate firing direction based on catapult angle
         const direction = new THREE.Vector3(
             Math.sin(this.angle),
             0.5,
             Math.cos(this.angle)
         ).normalize();
         
-        // Set stone position at the bucket
+        // Determine stone position
         const bucketWorldPos = new THREE.Vector3();
+        let stonePosition;
+        
         if (this.bucket) {
             this.bucket.getWorldPosition(bucketWorldPos);
-            stone.position.copy(bucketWorldPos);
+            stonePosition = bucketWorldPos;
         } else {
-            stone.position.copy(this.position).add(direction.clone().multiplyScalar(2).setY(1));
+            stonePosition = this.position.clone().add(direction.clone().multiplyScalar(2).setY(1));
         }
+        
+        // Pozisyon belirlendikten sonra taşı oluştur
+        const stone = new Stone(this.scene, stonePosition);
         
         // Set velocity based on power and direction
         stone.velocity.copy(direction).multiplyScalar(this.power);
@@ -177,17 +179,31 @@ export class Catapult {
 }
 
 export class Stone {
-    constructor(scene) {
+    constructor(scene, position) {
         this.scene = scene;
         this.mesh = null; // Renamed from model for consistency
-        this.position = new THREE.Vector3();
-        this.velocity = new THREE.Vector3();
-        this.radius = 0.3; // Daha küçük taş yarıçapı
+        
+        // Eğer pozisyon belirtilmişse o pozisyonu kullan, belirtilmemişse boş vektör oluşturma
+        if (position) {
+            this.position = position.clone();
+        } else {
+            // Pozisyon belirtilmemiş, varsayılan değer atama
+            this.position = null;
+        }
+          this.velocity = new THREE.Vector3();
+        this.radius = 0.25; // Daha küçük taş yarıçapı (0.3 -> 0.25)
         this.lifetime = 10; // Seconds before despawning
         this.active = true;
+        this.isStatic = true; // Varsayılan olarak statik (yerçekiminden etkilenmez)
+        this.isLaunched = false; // Fırlatılıp fırlatılmadığı
     }
-    
-    load() {
+      load() {
+        // Eğer pozisyon değeri yoksa, bu taşı yükleme
+        if (!this.position) {
+            console.log("Taş yüklenmedi: pozisyon belirtilmemiş");
+            return;
+        }
+        
         // GLTF model yüklemeyi dene
         const gltfLoader = new GLTFLoader();
         gltfLoader.load('./models/stone.glb', (gltf) => {
@@ -213,34 +229,42 @@ export class Stone {
             this.mesh.castShadow = true;
             this.scene.add(this.mesh); // Fixed: using add instead of addObject
         });
-    }
-    
-    update(deltaTime) {
-        if (!this.mesh) return;
+    }    update(deltaTime) {
+        // Eğer mesh yoksa veya pozisyon atanmamışsa işlem yapma
+        if (!this.mesh || !this.position) return;
         
-        // Apply gravity
-        this.velocity.add(this.scene.gravity.clone().multiplyScalar(deltaTime));
-        
-        // Update position
-        this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
-        this.mesh.position.copy(this.position);
-        
-        // Decrease lifetime
-        this.lifetime -= deltaTime;
-        if (this.lifetime <= 0) {
-            this.remove();
-        }
-        
-        // Check for ground collision
-        if (this.position.y <= this.radius) {
-            this.position.y = this.radius;
-            this.velocity.y *= -0.5; // Bounce with damping
-            this.velocity.x *= 0.9;
-            this.velocity.z *= 0.9;
+        // Statik taşlar için fiziği uygulamıyoruz
+        if (!this.isStatic) {
+            // Apply gravity
+            this.velocity.add(this.scene.gravity.clone().multiplyScalar(deltaTime));
             
-            // If velocity is very low, stop movement
-            if (this.velocity.length() < 1) {
-                this.velocity.set(0, 0, 0);
+            // Update position
+            this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+            this.mesh.position.copy(this.position);
+            
+            // Decrease lifetime
+            this.lifetime -= deltaTime;
+            if (this.lifetime <= 0) {
+                this.remove();
+            }
+                  // Check for ground collision
+            if (this.position.y <= this.radius * 0.5) { // Yarıçapın yarısı kadar mesafe yeterli
+                this.position.y = this.radius * 0.5; // Taş yarı yarıya toprağa gömülü olsun
+                this.velocity.y *= -0.3; // Zıplama etkisini azalt (0.5 -> 0.3)
+                this.velocity.x *= 0.8; // Sürtünmeyi artır (0.9 -> 0.8)
+                this.velocity.z *= 0.8; // Sürtünmeyi artır (0.9 -> 0.8)
+                
+                // If velocity is very low, stop movement
+                if (this.velocity.length() < 1) {
+                    this.velocity.set(0, 0, 0);
+                    // Taş durduğunda statik yapabiliriz
+                    // this.isStatic = true; // İsteğe bağlı
+                }
+            }
+        } else {
+            // Statik taşlar için sadece pozisyonu güncelleyelim
+            if (this.mesh) {
+                this.mesh.position.copy(this.position);
             }
         }
         
@@ -264,8 +288,7 @@ export class Stone {
             this.position.add(direction.multiplyScalar(separation));
         }
     }
-    
-    remove() {
+      remove() {
         if (!this.active) return;
         
         this.active = false;
@@ -273,6 +296,16 @@ export class Stone {
             this.scene.remove(this.mesh); // Fixed: using remove instead of removeObject
             this.mesh = null;
         }
+    }
+    
+    // Taşın fırlatılmasını sağlayan metod
+    launch(direction, power) {
+        // Taşı statik olmayan ve fırlatılmış olarak işaretle
+        this.isStatic = false;
+        this.isLaunched = true;
+        
+        // Hızını ayarla
+        this.velocity.copy(direction).multiplyScalar(power);
     }
 }
 
