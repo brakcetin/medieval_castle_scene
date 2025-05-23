@@ -176,69 +176,15 @@ class App {
             // Tüm modelleri önceden yükle
             console.log("Tüm modeller AssetLoader ile yükleniyor...");
             await assetLoader.preloadAllModels();
-            
-            // Scene Manager aracılığıyla sahneyi yükle
+              // Scene Manager aracılığıyla sahneyi yükle
             await this.sceneManager.loadCastle();
+              // Mancınık SceneManager tarafından initializeCatapult() metodu ile oluşturulacak
+            await this.sceneManager.initializeCatapult();
+            console.log("Mancınık SceneManager tarafından oluşturuldu");
+              // NOT: Meşaleler artık sadece scene.js içindeki createTorches() metodu ile oluşturuluyor
+            // NOT: Taşlar artık sadece scene.js içindeki createStones() metodu ile oluşturuluyor
             
-            // Mancınık model yükleme ve yerleştirme
-            this.sceneManager.objects.catapult = new Catapult(this.sceneManager);
-            
-            // Modelleri AssetLoader kullanarak yükle
-            if (assetLoader.assets['catapult']) {
-                this.sceneManager.objects.catapult.model = assetLoader.getModelCopy('catapult');
-                this.sceneManager.scene.add(this.sceneManager.objects.catapult.model);
-                this.sceneManager.objects.catapult.loaded = true;
-                console.log("Mancınık modeli AssetLoader'dan yüklendi");
-            } else {
-                // Yüklenemezse normal yöntemle yükle
-                console.log("Mancınık modelinin normal yüklemesi başlatılıyor...");
-                const loader = new GLTFLoader();
-                this.sceneManager.objects.catapult.load(loader);
-            }
-            
-            // Meşale modellerini oluştur
-            this.sceneManager.objects.torches = [];
-            const torchPositions = [
-                new THREE.Vector3(5, 0, 5),
-                new THREE.Vector3(-5, 0, 5),
-                new THREE.Vector3(5, 0, -5),
-                new THREE.Vector3(-5, 0, -5)
-            ];
-            
-            torchPositions.forEach(position => {
-                const torch = new Torch(this.sceneManager, position);
-                
-                // AssetLoader ile yüklemeyi dene
-                if (assetLoader.assets['torch']) {
-                    torch.model = assetLoader.getModelCopy('torch');
-                    torch.model.position.copy(position);
-                    torch.model.scale.set(assetLoader.TORCH_SCALE, assetLoader.TORCH_SCALE, assetLoader.TORCH_SCALE);
-                    this.sceneManager.scene.add(torch.model);
-                    torch.loaded = true;
-                } else {
-                    // Normal yükleme
-                    torch.load();
-                }
-                
-                this.sceneManager.objects.torches.push(torch);
-            });
-            
-            // Taş modelini test için yükleyelim - kalenin dışına yerleştir
-            const stone = new Stone(this.sceneManager);
-            stone.position.set(10, 1, 10); // Kale dışında bir pozisyon
-            stone.radius = 0.5; // Taşın boyutunu küçült
-            
-            // AssetLoader ile yüklemeyi dene
-            if (assetLoader.assets['stone']) {
-                stone.mesh = assetLoader.getModelCopy('stone');
-                stone.mesh.position.copy(stone.position);
-                stone.mesh.scale.set(assetLoader.STONE_SCALE, assetLoader.STONE_SCALE, assetLoader.STONE_SCALE);
-                this.sceneManager.scene.add(stone.mesh);
-                stone.loaded = true;
-            } else {
-                // Normal yükleme
-                stone.load();
-            }
+            // Bu kısımda taş oluşturma kodu kaldırıldı - kalenin ortasındaki taş sorununu çözüyor
             
             // Yükleme tamamlandı, ekranı gizle
             if (this.loadingElement) {
@@ -273,12 +219,11 @@ class App {
         
         // Kale modelini yükle
         gltfLoader.load('./models/castle.glb', (gltf) => {
-            const castle = gltf.scene;
-            castle.name = "castle";
+            const castle = gltf.scene;            castle.name = "castle";
             castle.userData.type = "castle";
             
             // Kale ölçeğini sabit olarak ayarla
-            castle.scale.set(0.08, 0.08, 0.08);
+            castle.scale.set(0.34, 0.34, 0.34); // Değer 0.08'den 0.34'e yükseltildi
             castle.position.set(0, 0, 0);
             
             castle.traverse((child) => {
@@ -301,34 +246,30 @@ class App {
             console.error('Kale modeli yüklenirken hata oluştu:', error);
             checkLoaded();
         });
-        
-        // Mancınık modelini yükle
-        this.sceneManager.objects.catapult = new Catapult(this.sceneManager);
-        this.sceneManager.objects.catapult.load(gltfLoader);
-        checkLoaded();
-        
-        // Meşale modellerini oluştur
-        this.sceneManager.objects.torches = [];
-        const torchPositions = [
-            new THREE.Vector3(5, 0, 5),
-            new THREE.Vector3(-5, 0, 5),
-            new THREE.Vector3(5, 0, -5),
-            new THREE.Vector3(-5, 0, -5)
-        ];
-        
-        torchPositions.forEach(position => {
-            const torch = new Torch(this.sceneManager, position);
-            torch.load();
-            this.sceneManager.objects.torches.push(torch);
+          // Mancınık modelini SceneManager ile yükle
+        this.sceneManager.initializeCatapult().then(() => {
+            console.log("Mancınık SceneManager tarafından yüklendi (legacy mode)");
+            checkLoaded();
+        }).catch(error => {
+            console.error("Mancınık yüklenirken hata oluştu:", error);
+            checkLoaded();
         });
-        checkLoaded();
-        
-        // Taş modelini test için yükleyelim
-        const stone = new Stone(this.sceneManager);
-        stone.position.set(10, 1, 10);
-        stone.radius = 0.5;
-        stone.load();
-        checkLoaded();
+          // Meşaleler scene.js içindeki createTorches() metodu ile oluşturuluyor
+        // SceneManager'a meşaleleri yükleme talimatı ver
+        this.sceneManager.createTorches().then(() => {
+            console.log("Meşaleler SceneManager tarafından yüklendi (legacy mode)");
+            checkLoaded();
+        }).catch(error => {
+            console.error("Meşaleler yüklenirken hata oluştu:", error);
+            checkLoaded();
+        });        // Taşlar scene.js içindeki createStones() metodu ile oluşturuluyor
+        this.sceneManager.createStones().then(() => {
+            console.log("Taşlar SceneManager tarafından yüklendi (legacy mode)");
+            checkLoaded();
+        }).catch(error => {
+            console.error("Taşlar yüklenirken hata oluştu:", error);
+            checkLoaded();
+        });
     }
     
     onWindowResize() {

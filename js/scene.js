@@ -277,7 +277,7 @@ export class SceneManager {
         console.log("Kale yükleme işlemi yedek yöntemle başlatıldı");
         
         // KALENIN SABIT ÖLÇEK DEĞERI
-        const CASTLE_SCALE = 0.08;
+        const CASTLE_SCALE = 0.34; // Değer 0.08'den 0.34'e yükseltildi, AssetLoader ile aynı değer
         
         // Tüm mevcut kaleleri temizle
         this.cleanupModelsByName("castle");
@@ -397,14 +397,11 @@ export class SceneManager {
                 this.objects.stones.forEach(stone => {
                     if (stone && stone.mesh) {
                         this.scene.remove(stone.mesh);
-                    }
-                });
-                this.objects.stones = [];
-            }
-              // 5 adet taş oluştur - mancınık yakınında yerleştir
+                    }                });                this.objects.stones = [];            }            // 5 adet taş oluştur - mancınık yakınında yerleştir
             for (let i = 0; i < 5; i++) {
-                const position = new THREE.Vector3(2 + i, 0, -8); // Mancınık tarafına yerleştir
+                const position = new THREE.Vector3(2 + i, 0.0, 9); // Y pozisyonunu 0.15 yaparak zemine daha yakın tutuyoruz
                 const stone = new Stone(this, position);
+                stone.isStatic = true; // Statik olarak işaretle, yerçekimi etkilemesin
                 
                 // AssetLoader kullanarak ekleyelim
                 if (assetLoader.assets['stone']) {
@@ -423,16 +420,15 @@ export class SceneManager {
                     stone.load();
                 }
                 
-                this.objects.stones.push(stone);
-            }
-        } catch (error) {
+                this.objects.stones.push(stone);            }        } catch (error) {
             console.error("Taşlar yüklenirken hata:", error);
-              // Klasik yöntemle taşları yükle
+            // Klasik yöntemle taşları yükle
             for (let i = 0; i < 5; i++) {
                 const stone = new Stone(
                     this,
-                    new THREE.Vector3(2 + i, 0, -8) // Mancınık tarafına yerleştir
+                    new THREE.Vector3(2 + i, 0.0, 9) // Daha alçak pozisyon (y: 0.15) - zemine daha yakın duracak
                 );
+                stone.isStatic = true; // Statik olarak işaretle, yerçekimi etkilemesin
                 stone.load();
                 this.objects.stones.push(stone);
             }
@@ -466,12 +462,11 @@ export class SceneManager {
         }
         
         return false;
-    }
-      launchStone() {
+    }    launchStone() {
         const stone = this.objects.catapult.launch();
         if (stone) {
-            // Yön güncellemesi - mancınık artık diğer tarafta
-            const direction = new THREE.Vector3(0, 1, 1).normalize(); // z ekseni boyunca pozitif yönde fırlat
+            // Mancınık ters döndü ama aynı pozisyonda, o yüzden negatif Z yönünde fırlat
+            const direction = new THREE.Vector3(0, 1, -1).normalize(); // z ekseni boyunca negatif yönde fırlat (kaleye doğru)
             stone.launch(direction, 15);
             this.updateScore(10);
         }
@@ -502,16 +497,15 @@ export class SceneManager {
     // Mancınık oluşturan ve yükleyen metod
     async initializeCatapult() {
         console.log("Mancınık oluşturuluyor...");
-        
-        // Mevcut mancınık varsa temizle
+          // Mevcut mancınık varsa temizle
         if (this.objects.catapult && this.objects.catapult.model) {
             this.scene.remove(this.objects.catapult.model);
-        }        // Yeni mancınık nesnesi oluştur
-        const position = new THREE.Vector3(0, 0, -15); // Kale'nin diğer tarafına yerleştir
+        }        // Yeni mancınık nesnesi oluştur - kaleye daha yakın pozisyonda
+        const position = new THREE.Vector3(0, 0.45, 10); // Daha yakın pozisyon ve yerden yükseltilmiş (y: 0 -> 0.5)
         const catapult = new Catapult(this);
         catapult.position = position;
         // Mancınık yönünü ters çevir - 180 derece (PI) döndür
-        catapult.angle = Math.PI;
+        catapult.angle = Math.PI; // Sadece yönünü değiştir
         
         // AssetLoader kullanarak yüklemeyi dene
         try {
