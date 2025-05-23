@@ -199,9 +199,11 @@ export class Stone {
         this.active = true;
         this.isStatic = true;
         this.isLaunched = false;
+        this.isCollected = false; // Toplama durumu için yeni özellik
     }
-    
-    load() {
+      load() {
+        console.log("Stone.load() çağrıldı, pozisyon:", this.position);
+        
         if (!this.position) {
             console.log("Taş yüklenmedi: pozisyon belirtilmemiş");
             return;
@@ -209,6 +211,7 @@ export class Stone {
         
         const gltfLoader = new GLTFLoader();
         gltfLoader.load('./models/stone.glb', (gltf) => {
+            console.log("Stone modeli başarıyla yüklendi");
             this.mesh = gltf.scene;
             this.mesh.position.copy(this.position);
             this.mesh.scale.set(0.4, 0.4, 0.4); // Boyutu artırdık
@@ -220,19 +223,24 @@ export class Stone {
                 }
             });
             
-            this.scene.add(this.mesh);
-        }, undefined, (error) => {
-            console.error("Taş modeli yüklenirken hata:", error);
-            const geometry = new THREE.SphereGeometry(this.radius, 32, 32); // Daha detaylı küre
+            this.scene.scene.add(this.mesh); // SceneManager'dan scene'e erişim
+            console.log("Taş sahneye eklendi");
+        }, undefined, (error) => {            console.error("Taş modeli yüklenirken hata:", error);
+            console.log("Fallback küre geometrisi oluşturuluyor");
+              const geometry = new THREE.SphereGeometry(1.2, 32, 32); // Çok büyük boyut (0.8'den 1.2'ye)
             const material = new THREE.MeshStandardMaterial({ 
-                color: 0x888888,
-                roughness: 0.7,
-                metalness: 0.3
-            });
-            this.mesh = new THREE.Mesh(geometry, material);
+                color: 0xFF4444,  // Parlak kırmızı renk
+                roughness: 0.3,
+                metalness: 0.1,
+                emissive: 0x441111, // Hafif kırmızı ışıma
+                emissiveIntensity: 0.3
+            });            this.mesh = new THREE.Mesh(geometry, material);
             this.mesh.position.copy(this.position);
             this.mesh.castShadow = true;
-            this.scene.add(this.mesh);
+            this.scene.scene.add(this.mesh); // SceneManager'dan scene'e erişim
+            console.log("Fallback taş sahneye eklendi, pozisyon:", this.position);
+            console.log("Taş mesh ID:", this.mesh.uuid);
+            console.log("Sahne çocuk sayısı (taş eklendikten sonra):", this.scene.scene.children.length);
         });
     }
     
@@ -447,5 +455,146 @@ export class Torch {
         }
         
         return wasLit;
+    }
+}
+
+export class HandTorch {
+    constructor(scene) {
+        this.scene = scene;
+        this.model = null;
+        this.light = null;
+        this.flame = null;
+        this.intensity = 6;
+        this.color = 0xff6a00;
+        this.isActive = false;
+        this.flickerSpeed = 0.8;
+        this.flickerIntensity = 0.3;
+        this.time = 0;
+    }
+    
+    create() {
+        // Basit meşale modeli oluştur
+        const group = new THREE.Group();
+        
+        // Sap
+        const handleGeometry = new THREE.CylinderGeometry(0.02, 0.03, 0.4);
+        const handleMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+        const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+        handle.position.y = -0.2;
+        group.add(handle);
+        
+        // Meşale başı
+        const torchGeometry = new THREE.CylinderGeometry(0.05, 0.03, 0.15);
+        const torchMaterial = new THREE.MeshStandardMaterial({ color: 0x654321 });
+        const torchHead = new THREE.Mesh(torchGeometry, torchMaterial);
+        torchHead.position.y = 0.075;
+        group.add(torchHead);
+        
+        // Işık
+        this.light = new THREE.PointLight(this.color, this.intensity, 8);
+        this.light.position.y = 0.15;
+        this.light.castShadow = true;
+        this.light.shadow.mapSize.width = 512;
+        this.light.shadow.mapSize.height = 512;
+        group.add(this.light);
+        
+        // Alev efekti
+        const flameGeometry = new THREE.ConeGeometry(0.04, 0.1, 6);
+        const flameMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xff4500,
+            transparent: true,
+            opacity: 0.8
+        });
+        this.flame = new THREE.Mesh(flameGeometry, flameMaterial);
+        this.flame.position.y = 0.15;
+        group.add(this.flame);
+          this.model = group;
+        
+        return group;
+    }
+      updatePosition(camera) {
+        if (!this.model || !this.isActive || !camera) return;
+        
+        // Kameranın sağ alt köşesine yerleştir
+        const cameraDirection = new THREE.Vector3();
+        camera.getWorldDirection(cameraDirection);
+        
+        const rightVector = new THREE.Vector3();
+        rightVector.crossVectors(camera.up, cameraDirection).normalize();
+        
+        const position = camera.position.clone();
+        position.add(rightVector.multiplyScalar(0.3)); // Sağa
+        position.add(cameraDirection.multiplyScalar(0.5)); // Öne
+        position.y -= 0.2; // Aşağı
+        
+        this.model.position.copy(position);
+        
+        // Kamera yönüne bakacak şekilde döndür
+        this.model.lookAt(
+            position.x + cameraDirection.x,
+            position.y + cameraDirection.y,
+            position.z + cameraDirection.z
+        );
+    }
+    
+    update(deltaTime, camera) {
+        if (!this.isActive || !this.model) return;
+        
+        this.time += deltaTime;
+        this.updatePosition(camera);
+        
+        // Titreme efekti
+        const flicker = Math.sin(this.time * this.flickerSpeed) * this.flickerIntensity;
+        
+        if (this.light) {
+            this.light.intensity = this.intensity * (1 + flicker);
+        }
+        
+        if (this.flame) {
+            const scale = 1 + flicker * 0.5;
+            this.flame.scale.set(scale, scale, scale);
+        }
+    }
+
+    show() {
+        this.isActive = true;
+        
+        if (!this.model) {
+            this.scene.scene.add(this.create());
+        } else {
+            this.model.visible = true;
+        }
+    }
+
+    hide() {
+        this.isActive = false;
+        
+        if (this.model) {
+            this.model.visible = false;
+        }
+    }
+    
+    toggle() {
+        this.isActive = !this.isActive;
+        
+        if (this.isActive) {
+            if (!this.model) {
+                this.scene.scene.add(this.create());
+            } else {
+                this.model.visible = true;
+            }
+        } else if (this.model) {
+            this.model.visible = false;
+        }
+        
+        return this.isActive;
+    }
+    
+    remove() {
+        if (this.model) {
+            this.scene.scene.remove(this.model);
+            this.model = null;
+        }
+        this.isActive = false;
     }
 }

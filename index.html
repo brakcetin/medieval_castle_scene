@@ -6,20 +6,32 @@
     <title>Ortaçağ Kale Sahnesi</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body>    <div id="score-panel">Puan: <span id="score">0</span></div>
-    <div id="controls-panel">
+<body>    <div id="score-panel">Puan: <span id="score">0</span></div>    <div id="controls-panel">
         <button id="day-night-toggle">Gece/Gündüz</button>
+    </div>
+    <div id="time-control-panel">
+        <h4>Zaman Kontrolü</h4>
+        <label for="time-slider">Saat: <span id="time-display">12</span></label>
+        <input type="range" id="time-slider" min="0" max="24" step="0.5" value="12">
+        <p>Gece: 20-6, Gündüz: 6-20</p>
+    </div><div id="instructions">
+        <h3>Oyun Kontrolleri:</h3>
+        <p><strong>W, A, S, D</strong> - Hareket</p>
+        <p><strong>Sol Tık + Sürükle</strong> - Kamera</p>
+        <p><strong>Kayalara Tık</strong> - Taş Topla</p>
+        <p><strong>Mancınığa Tık</strong> - Yükle/Fırlat</p>
+        <p><strong>F</strong> - El Meşalesi Aç/Kapat</p>
     </div>
     <div id="loading">Yükleniyor...</div>
     <canvas id="scene-canvas"></canvas>
 
     <!-- Three.js ve İlgili Kütüphaneler -->
-    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
-    <script type="importmap">
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>    <script type="importmap">
         {
             "imports": {
                 "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "dat.gui": "https://unpkg.com/dat.gui@0.7.9/build/dat.gui.module.js"
             }
         }
     </script>

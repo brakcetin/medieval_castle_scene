@@ -385,35 +385,45 @@ export class SceneManager {
                 this.objects.torches.push(torch);
             });
         }
-    }
-    
-    async createStones() {
+    }    async createStones() {
+        console.log("createStones metodu çağrıldı");
+        
         // Önceki taşları temizle
         if (this.objects.stones && this.objects.stones.length > 0) {
+            console.log(`${this.objects.stones.length} önceki taş temizleniyor`);
             this.objects.stones.forEach(stone => {
                 if (stone && stone.mesh) {
                     this.scene.remove(stone.mesh);
                 }
             });
             this.objects.stones = [];
-        }
-
-        // Mancınığın yanında 5 taş oluştur
-        const catapultPos = this.objects.catapult.position;
+        }        // Mancınığın yanında tıklanabilir kayalar oluştur (sağ tarafta)
+        const catapultPos = this.objects.catapult ? this.objects.catapult.position : new THREE.Vector3(0, 0, 10);
+        console.log("Mancınık pozisyonu:", catapultPos);
+          // Test için taşları kameraya çok yakın yerleştir (görünürlük garantisi için)
         const stonePositions = [
-            new THREE.Vector3(catapultPos.x - 2, 0.3, catapultPos.z),
-            new THREE.Vector3(catapultPos.x - 1, 0.3, catapultPos.z),
-            new THREE.Vector3(catapultPos.x, 0.3, catapultPos.z),
-            new THREE.Vector3(catapultPos.x + 1, 0.3, catapultPos.z),
-            new THREE.Vector3(catapultPos.x + 2, 0.3, catapultPos.z)
+            new THREE.Vector3(1, 0.5, 5),   // Kameranın çok yakınında
+            new THREE.Vector3(2, 0.5, 4),   
+            new THREE.Vector3(0, 0.5, 4),   
+            new THREE.Vector3(-1, 0.5, 5),   
+            new THREE.Vector3(1.5, 0.5, 3),   
+            new THREE.Vector3(-1.5, 0.5, 3),  
+            new THREE.Vector3(0, 0.5, 2)   // En yakın taş
         ];
 
-        for (let position of stonePositions) {
+        for (let i = 0; i < stonePositions.length; i++) {
+            const position = stonePositions[i];
+            console.log(`Taş ${i + 1} oluşturuluyor, pozisyon:`, position);
+            
             const stone = new Stone(this, position);
             stone.isStatic = true;
-            this.scene.add(stone.mesh);
+            stone.isCollected = false; // Toplama durumu için
+            stone.load(); // Stone'u yükle
             this.objects.stones.push(stone);
         }
+          console.log(`${stonePositions.length} adet tıklanabilir kaya oluşturuldu`);
+        console.log("Toplam stones array uzunluğu:", this.objects.stones.length);
+        console.log("Sahnedeki toplam çocuk sayısı:", this.scene.children.length);
     }
     
     interactWithObject(raycaster) {
@@ -530,9 +540,14 @@ export class SceneManager {
             console.error("Mancınık yüklenirken hata:", error);
             catapult.load(new GLTFLoader());
         }
-        
-        // Referansı güncelle
+          // Referansı güncelle
         this.objects.catapult = catapult;
+        
+        // Mancınık oluşturulduktan sonra kayaları oluştur
+        setTimeout(() => {
+            this.createStones();
+        }, 500); // Mancınığın yüklenmesi için kısa bir bekleme
+        
         return catapult;
     }
 }
