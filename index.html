@@ -9,8 +9,37 @@
 <body>    <div id="score-panel">Puan: <span id="score">0</span></div>
     <div id="controls-panel">
         <button id="day-night-toggle">Gece/Gündüz</button>
+        <button id="help-toggle">Yardım</button>
     </div>
     <div id="loading">Yükleniyor...</div>
+
+    <!-- Kontrol Yardımı Paneli -->
+    <div id="controls-help" class="hidden">
+        <div class="help-panel">
+            <h2>Kontroller</h2>
+            <div class="help-section">
+                <h3>Kamera Kontrolleri</h3>
+                <ul>
+                    <li><strong>1, 2, 3:</strong> Kamera modu (Serbest, Takip, Kuşbakışı)</li>
+                    <li><strong>L:</strong> Kamerayı kilitle/aç</li>
+                    <li><strong>W, A, S, D:</strong> İleri, sola, geri, sağa hareket</li>
+                    <li><strong>Q, E:</strong> Yukarı, aşağı hareket</li>
+                    <li><strong>Z, C:</strong> Sola, sağa dönüş</li>
+                    <li><strong>R, F:</strong> Yukarı, aşağı bakış</li>
+                </ul>
+            </div>
+            <div class="help-section">
+                <h3>Mancınık Kontrolleri</h3>
+                <ul>
+                    <li><strong>← →:</strong> Mancınığı sola/sağa döndür</li>
+                    <li><strong>↑ ↓:</strong> Atış açısını yukarı/aşağı ayarla</li>
+                    <li><strong>Space (Boşluk):</strong> Şarj et ve bırakarak ateşle</li>
+                </ul>
+            </div>
+            <button id="close-help">Kapat</button>
+        </div>
+    </div>
+
     <canvas id="scene-canvas"></canvas>
 
     <!-- Three.js ve İlgili Kütüphaneler -->

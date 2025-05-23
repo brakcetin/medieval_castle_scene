@@ -10,10 +10,13 @@ export class Catapult {
         this.angle = 0;
         this.power = 50;
         this.maxPower = 100;
+        this.fireAngle = 45; // Dikey atış açısı (derece)
         this.charging = false;
         this.animationTime = 0;
         this.armRotation = 0;
         this.animating = false;
+        this.cooldown = 0; // Atışlar arası bekleme süresi
+        this.loadedStone = null; // Mancınıkta yüklü olan taş
         
         // Position and properties
         this.position = new THREE.Vector3(0, 0, 10);
@@ -23,6 +26,13 @@ export class Catapult {
         this.base = null;
         this.arm = null;
         this.bucket = null;
+        
+        // Görsel geribildirim için yardımcı elemanlar
+        this.powerBar = null;
+        this.aimHelper = null;
+        
+        // Atılan taşların geçici saklanması
+        this.firedStones = [];
     }
       
     load(gltfLoader) {
@@ -66,8 +76,14 @@ export class Catapult {
                 this.arm.add(this.bucket);
             }
               
-            this.scene.add(this.model); // Fixed: using add instead of addObject
+            this.scene.add(this.model);
             this.loaded = true;
+            
+            // Yardımcı görsel elemanları oluştur
+            this.initHelpers();
+            
+            // İlk taşı yükle
+            this.loadStone();
         }, undefined, (error) => {
             console.error('Mancınık modeli yüklenirken hata oluştu:', error);
             
@@ -92,14 +108,25 @@ export class Catapult {
             this.bucket.position.y = 1;
             this.arm.add(this.bucket);
             
-            this.scene.add(this.model); // Fixed: using add instead of addObject
+            this.scene.add(this.model);
             this.loaded = true;
+            
+            // Yardımcı görsel elemanları oluştur
+            this.initHelpers();
+            
+            // İlk taşı yükle
+            this.loadStone();
         });
     }
-    
-    update(deltaTime) {
+      update(deltaTime) {
         if (!this.loaded) return;
         
+        // Soğuma süresini güncelle
+        if (this.cooldown > 0) {
+            this.cooldown -= deltaTime;
+        }
+        
+        // Şarj sırasında güç ve görsel geribildirim güncelleme
         if (this.charging) {
             this.power = Math.min(this.power + 30 * deltaTime, this.maxPower);
             
@@ -107,9 +134,19 @@ export class Catapult {
             if (this.arm) {
                 this.arm.rotation.x = Math.max(-Math.PI / 2, -Math.PI / 4 - (this.power / this.maxPower) * Math.PI / 4);
             }
+            
+            // Update power bar
+            if (this.powerBar) {
+                this.powerBar.scale.y = this.power / this.maxPower;
+                
+                // Renk değişimi (yeşilden kırmızıya doğru)
+                const normalizedPower = this.power / this.maxPower;
+                const color = new THREE.Color(normalizedPower, 1 - normalizedPower, 0);
+                this.powerBar.material.color = color;
+            }
         }
         
-        // Animate firing
+        // Atış animasyonu
         if (this.animating) {
             this.animationTime += deltaTime * 3; // Animation speed
             
@@ -126,55 +163,217 @@ export class Catapult {
                 if (this.arm) {
                     this.arm.rotation.x = -Math.PI / 4;
                 }
+                
+                // Animasyon tamamlandıktan sonra yeni taş yükle
+                if (!this.loadedStone) {
+                    setTimeout(() => {
+                        this.loadStone();
+                    }, 1000); // 1 saniye sonra yeni taş yükle
+                }
             }
         }
         
         // Update model position and rotation
         this.model.position.copy(this.position);
         this.model.rotation.y = this.angle;
+        
+        // Yüklü taş varsa pozisyonunu güncelle
+        if (this.loadedStone && this.loadedStone.mesh) {
+            const bucketPos = this.getBucketPosition();
+            this.loadedStone.position.copy(bucketPos);
+            this.loadedStone.mesh.position.copy(bucketPos);
+        }
+        
+        // Nişan yardımcısını güncelle
+        this.updateAimHelper();
     }
     
     rotate(direction) {
         this.angle += direction * 0.02;
+        
+        // Açıyı 0-2*PI aralığında tut
+        if (this.angle < 0) this.angle += 2 * Math.PI;
+        if (this.angle > 2 * Math.PI) this.angle -= 2 * Math.PI;
+    }
+    
+    // Atış açısını ayarla (yukarı/aşağı)
+    adjustFireAngle(delta) {
+        this.fireAngle = Math.max(15, Math.min(75, this.fireAngle + delta));
+        
+        // Nişan yardımcısını güncelle
+        this.updateAimHelper();
     }
     
     startCharging() {
+        // Soğuma süreci içerisinde veya taş yoksa şarj etme
+        if (this.cooldown > 0 || !this.loadedStone) return;
+        
         this.charging = true;
-        this.power = 20;
+        this.power = 20; // Başlangıç gücü
+        
+        // Güç göstergesini görünür yap
+        if (this.powerBar) {
+            this.powerBar.visible = true;
+        }
     }
     
     fire() {
-        if (!this.charging) return null;
+        // Şarj edilmiyorsa veya soğuma süreci içerisindeyse ateş etme
+        if (!this.charging || this.cooldown > 0 || !this.loadedStone) return null;
         
         this.charging = false;
         this.animating = true;
         this.animationTime = 0;
-          // Calculate firing direction based on catapult angle
+        this.cooldown = 2; // 2 saniyelik soğuma süresi
+        
+        // Güç göstergesini gizle
+        if (this.powerBar) {
+            this.powerBar.visible = false;
+        }
+        
+        // Atış açısını (radyan) hesapla
+        const verticalAngle = THREE.MathUtils.degToRad(this.fireAngle);
+        
+        // Calculate firing direction based on catapult angle and fire angle
+        const direction = new THREE.Vector3(
+            Math.sin(this.angle) * Math.cos(verticalAngle),
+            Math.sin(verticalAngle),
+            Math.cos(this.angle) * Math.cos(verticalAngle)
+        ).normalize();
+        
+        // Yüklü taşı al
+        const stone = this.loadedStone;
+        
+        // Taşı statik olmayan, fırlatılmış olarak işaretle
+        stone.isStatic = false;
+        stone.isLaunched = true;
+        
+        // Set velocity based on power and direction
+        stone.velocity.copy(direction).multiplyScalar(this.power * 0.1);
+        
+        // Taşın artık mancınığın parçası olmadığını işaretle
+        this.loadedStone = null;
+        
+        // Fırlatılan taşı listeye ekle
+        this.firedStones.push(stone);
+        
+        // Taşı döndür
+        stone.addRotation();
+        
+        return stone;
+    }
+    
+    // Mancınığa yeni taş yükleme metodu
+    loadStone() {
+        // Eğer zaten yüklü taş varsa, yeni taş yükleme
+        if (this.loadedStone) return;
+        
+        // Kovadaki pozisyonu al
+        const bucketPos = this.getBucketPosition();
+        
+        // Yeni taş oluştur
+        const stone = new Stone(this.scene, bucketPos);
+        stone.load();
+        
+        // Taşı mancınığın yüklü taşı olarak referansla
+        this.loadedStone = stone;
+    }
+    
+    // Kovanın dünya koordinatlarındaki pozisyonunu alma
+    getBucketPosition() {
+        if (!this.bucket || !this.model) {
+            // Mancınık modeli henüz yüklenmemişse varsayılan değer
+            return new THREE.Vector3(
+                this.position.x,
+                this.position.y + 1,
+                this.position.z
+            );
+        }
+        
+        // Kovanın dünya pozisyonunu al
+        const bucketPos = new THREE.Vector3();
+        this.bucket.getWorldPosition(bucketPos);
+        
+        // Hafif yukarıda olacak şekilde offset ekle
+        bucketPos.y += 0.1;
+        
+        return bucketPos;
+    }
+    
+    initHelpers() {
+        // Güç göstergesi oluşturma
+        const powerBarGeometry = new THREE.BoxGeometry(0.1, 1, 0.1);
+        const powerBarMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.7
+        });
+        this.powerBar = new THREE.Mesh(powerBarGeometry, powerBarMaterial);
+        this.powerBar.position.set(0, 0.5, -2); // Mancınığın önünde
+        this.powerBar.scale.y = 0.1; // Başlangıçta küçük
+        this.model.add(this.powerBar);
+        
+        // Nişan yardımcısı oluşturma
+        const aimHelperGeometry = new THREE.BufferGeometry();
+        const numPoints = 50;
+        const positions = new Float32Array(numPoints * 3);
+        aimHelperGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        
+        const aimHelperMaterial = new THREE.LineBasicMaterial({
+            color: 0xffff00,
+            opacity: 0.7,
+            transparent: true
+        });
+        
+        this.aimHelper = new THREE.Line(aimHelperGeometry, aimHelperMaterial);
+        this.scene.add(this.aimHelper);
+        
+        this.updateAimHelper();
+    }
+    
+    updateAimHelper() {
+        if (!this.aimHelper) return;
+        
+        // Nişan çizgisini güncelle
+        const numPoints = 50;
+        const positions = this.aimHelper.geometry.attributes.position.array;
+        
+        // Atış açısı (radyan)
+        const verticalAngle = THREE.MathUtils.degToRad(this.fireAngle);
+        
+        // Başlangıç pozisyonu
+        const startPos = this.getBucketPosition();
+        
+        // Atış yönü (mancınık açısına göre)
         const direction = new THREE.Vector3(
             Math.sin(this.angle),
-            0.5,
+            Math.sin(verticalAngle),
             Math.cos(this.angle)
         ).normalize();
         
-        // Determine stone position
-        const bucketWorldPos = new THREE.Vector3();
-        let stonePosition;
+        // Atış hızı
+        const velocity = direction.clone().multiplyScalar(this.power * 0.1);
         
-        if (this.bucket) {
-            this.bucket.getWorldPosition(bucketWorldPos);
-            stonePosition = bucketWorldPos;
-        } else {
-            stonePosition = this.position.clone().add(direction.clone().multiplyScalar(2).setY(1));
+        // Yerçekimi
+        const gravity = this.scene.gravity.clone();
+        
+        // Eğri noktalarını hesapla
+        for (let i = 0; i < numPoints; i++) {
+            const t = i * 0.1; // zaman adımı
+            
+            // v0*t + 0.5*a*t^2 formülüyle pozisyonu hesapla
+            const x = startPos.x + velocity.x * t;
+            const y = startPos.y + velocity.y * t + 0.5 * gravity.y * t * t;
+            const z = startPos.z + velocity.z * t;
+            
+            // Pozisyonu diziye yaz
+            positions[i * 3] = x;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = z;
         }
         
-        // Pozisyon belirlendikten sonra taşı oluştur
-        const stone = new Stone(this.scene, stonePosition);
-        
-        // Set velocity based on power and direction
-        stone.velocity.copy(direction).multiplyScalar(this.power);
-        
-        stone.load();
-        return stone;
+        // Geometriyi güncelle
+        this.aimHelper.geometry.attributes.position.needsUpdate = true;
     }
 }
 
@@ -306,6 +505,31 @@ export class Stone {
         
         // Hızını ayarla
         this.velocity.copy(direction).multiplyScalar(power);
+    }
+    
+    // Taş fırlatıldığında dönüş eklemek için
+    addRotation() {
+        if (!this.mesh) return;
+        
+        // Dönüş hızı
+        this.rotationSpeed = {
+            x: (Math.random() - 0.5) * 2, // -1 ile 1 arasında rastgele değer
+            y: (Math.random() - 0.5) * 2,
+            z: (Math.random() - 0.5) * 2
+        };
+        
+        // Update fonksiyonunu genişlet ve dönüşü ekle
+        const originalUpdate = this.update.bind(this);
+        this.update = (deltaTime) => {
+            originalUpdate(deltaTime);
+            
+            // Dönüşü uygula
+            if (this.mesh && this.rotationSpeed && !this.isStatic) {
+                this.mesh.rotation.x += this.rotationSpeed.x * deltaTime;
+                this.mesh.rotation.y += this.rotationSpeed.y * deltaTime;
+                this.mesh.rotation.z += this.rotationSpeed.z * deltaTime;
+            }
+        };
     }
 }
 
