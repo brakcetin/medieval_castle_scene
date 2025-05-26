@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Ortaçağ Kale Sahnesi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #222;
+            color: white;
+        }
+        .debug-info {
+            background: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .status {
+            color: #4CAF50;
+        }
+        .error {
+            color: #f44336;
+        }
+        .warning {
+            color: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Sayfası - Ortaçağ Kale Sahnesi</h1>
+    
+    <div class="debug-info">
+        <h3>Kütüphane Testleri:</h3>
+        <div id="library-tests"></div>
+    </div>
+    
+    <div class="debug-info">
+        <h3>Model Dosya Testleri:</h3>
+        <div id="model-tests"></div>
+    </div>
+    
+    <div class="debug-info">
+        <h3>JavaScript Modül Testleri:</h3>
+        <div id="module-tests"></div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "dat.gui": "https://unpkg.com/dat.gui@0.7.9/build/dat.gui.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        async function runTests() {
+            const libraryDiv = document.getElementById('library-tests');
+            const modelDiv = document.getElementById('model-tests');
+            const moduleDiv = document.getElementById('module-tests');
+            
+            // 1. Kütüphane testleri
+            try {
+                const THREE = await import('three');
+                libraryDiv.innerHTML += '<div class="status">✓ Three.js yüklendi</div>';
+                
+                const OrbitControls = await import('three/addons/controls/OrbitControls.js');
+                libraryDiv.innerHTML += '<div class="status">✓ OrbitControls yüklendi</div>';
+                
+                const GLTFLoader = await import('three/addons/loaders/GLTFLoader.js');
+                libraryDiv.innerHTML += '<div class="status">✓ GLTFLoader yüklendi</div>';
+                
+                const dat = await import('dat.gui');
+                libraryDiv.innerHTML += '<div class="status">✓ dat.GUI yüklendi</div>';
+                
+            } catch (error) {
+                libraryDiv.innerHTML += `<div class="error">✗ Kütüphane hatası: ${error.message}</div>`;
+            }
+            
+            // 2. Model dosya testleri
+            const models = ['castle.glb', 'catapult.glb', 'stone.glb', 'torch.glb'];
+            for (let model of models) {
+                try {
+                    const response = await fetch(`./models/${model}`);
+                    if (response.ok) {
+                        modelDiv.innerHTML += `<div class="status">✓ ${model} dosyası mevcut</div>`;
+                    } else {
+                        modelDiv.innerHTML += `<div class="error">✗ ${model} dosyası bulunamadı (${response.status})</div>`;
+                    }
+                } catch (error) {
+                    modelDiv.innerHTML += `<div class="error">✗ ${model} test hatası: ${error.message}</div>`;
+                }
+            }
+            
+            // 3. JavaScript modül testleri
+            try {
+                const { SceneManager } = await import('./js/scene.js');
+                moduleDiv.innerHTML += '<div class="status">✓ SceneManager modülü yüklendi</div>';
+                
+                const { Catapult, Stone, Torch, HandTorch } = await import('./js/objects.js');
+                moduleDiv.innerHTML += '<div class="status">✓ Objects modülü yüklendi</div>';
+                
+                // Test SceneManager
+                const renderer = new THREE.WebGLRenderer();
+                const camera = new THREE.PerspectiveCamera();
+                const sceneManager = new SceneManager(renderer, camera);
+                moduleDiv.innerHTML += '<div class="status">✓ SceneManager oluşturuldu</div>';
+                
+                // Test stones array
+                if (sceneManager.objects.stones) {
+                    moduleDiv.innerHTML += `<div class="status">✓ Stones array mevcut (${sceneManager.objects.stones.length} taş)</div>`;
+                } else {
+                    moduleDiv.innerHTML += '<div class="warning">⚠ Stones array bulunamadı</div>';
+                }
+                
+            } catch (error) {
+                moduleDiv.innerHTML += `<div class="error">✗ Modül test hatası: ${error.message}</div>`;
+            }
+        }
+          runTests();
+    </script>
+    
+    <!-- Load verification script -->
+    <script src="verify-stones.js"></script>
+</body>
+</html>

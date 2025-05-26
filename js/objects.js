@@ -10,13 +10,10 @@ export class Catapult {
         this.angle = 0;
         this.power = 50;
         this.maxPower = 100;
-        this.fireAngle = 45; // Dikey atış açısı (derece)
         this.charging = false;
         this.animationTime = 0;
         this.armRotation = 0;
         this.animating = false;
-        this.cooldown = 0; // Atışlar arası bekleme süresi
-        this.loadedStone = null; // Mancınıkta yüklü olan taş
         
         // Position and properties
         this.position = new THREE.Vector3(0, 0, 10);
@@ -27,12 +24,9 @@ export class Catapult {
         this.arm = null;
         this.bucket = null;
         
-        // Görsel geribildirim için yardımcı elemanlar
-        this.powerBar = null;
-        this.aimHelper = null;
-        
-        // Atılan taşların geçici saklanması
-        this.firedStones = [];
+        // Taş yükleme özellikleri
+        this.hasStone = false;
+        this.loadedStone = null;
     }
       
     load(gltfLoader) {
@@ -76,14 +70,8 @@ export class Catapult {
                 this.arm.add(this.bucket);
             }
               
-            this.scene.add(this.model);
+            this.scene.add(this.model); // Fixed: using add instead of addObject
             this.loaded = true;
-            
-            // Yardımcı görsel elemanları oluştur
-            this.initHelpers();
-            
-            // İlk taşı yükle
-            this.loadStone();
         }, undefined, (error) => {
             console.error('Mancınık modeli yüklenirken hata oluştu:', error);
             
@@ -108,25 +96,14 @@ export class Catapult {
             this.bucket.position.y = 1;
             this.arm.add(this.bucket);
             
-            this.scene.add(this.model);
+            this.scene.add(this.model); // Fixed: using add instead of addObject
             this.loaded = true;
-            
-            // Yardımcı görsel elemanları oluştur
-            this.initHelpers();
-            
-            // İlk taşı yükle
-            this.loadStone();
         });
     }
-      update(deltaTime) {
+    
+    update(deltaTime) {
         if (!this.loaded) return;
         
-        // Soğuma süresini güncelle
-        if (this.cooldown > 0) {
-            this.cooldown -= deltaTime;
-        }
-        
-        // Şarj sırasında güç ve görsel geribildirim güncelleme
         if (this.charging) {
             this.power = Math.min(this.power + 30 * deltaTime, this.maxPower);
             
@@ -134,19 +111,9 @@ export class Catapult {
             if (this.arm) {
                 this.arm.rotation.x = Math.max(-Math.PI / 2, -Math.PI / 4 - (this.power / this.maxPower) * Math.PI / 4);
             }
-            
-            // Update power bar
-            if (this.powerBar) {
-                this.powerBar.scale.y = this.power / this.maxPower;
-                
-                // Renk değişimi (yeşilden kırmızıya doğru)
-                const normalizedPower = this.power / this.maxPower;
-                const color = new THREE.Color(normalizedPower, 1 - normalizedPower, 0);
-                this.powerBar.material.color = color;
-            }
         }
         
-        // Atış animasyonu
+        // Animate firing
         if (this.animating) {
             this.animationTime += deltaTime * 3; // Animation speed
             
@@ -163,252 +130,91 @@ export class Catapult {
                 if (this.arm) {
                     this.arm.rotation.x = -Math.PI / 4;
                 }
-                
-                // Animasyon tamamlandıktan sonra yeni taş yükle
-                if (!this.loadedStone) {
-                    setTimeout(() => {
-                        this.loadStone();
-                    }, 1000); // 1 saniye sonra yeni taş yükle
-                }
             }
         }
         
         // Update model position and rotation
         this.model.position.copy(this.position);
         this.model.rotation.y = this.angle;
-        
-        // Yüklü taş varsa pozisyonunu güncelle
-        if (this.loadedStone && this.loadedStone.mesh) {
-            const bucketPos = this.getBucketPosition();
-            this.loadedStone.position.copy(bucketPos);
-            this.loadedStone.mesh.position.copy(bucketPos);
-        }
-        
-        // Nişan yardımcısını güncelle
-        this.updateAimHelper();
     }
     
     rotate(direction) {
         this.angle += direction * 0.02;
-        
-        // Açıyı 0-2*PI aralığında tut
-        if (this.angle < 0) this.angle += 2 * Math.PI;
-        if (this.angle > 2 * Math.PI) this.angle -= 2 * Math.PI;
-    }
-    
-    // Atış açısını ayarla (yukarı/aşağı)
-    adjustFireAngle(delta) {
-        this.fireAngle = Math.max(15, Math.min(75, this.fireAngle + delta));
-        
-        // Nişan yardımcısını güncelle
-        this.updateAimHelper();
     }
     
     startCharging() {
-        // Soğuma süreci içerisinde veya taş yoksa şarj etme
-        if (this.cooldown > 0 || !this.loadedStone) return;
-        
         this.charging = true;
-        this.power = 20; // Başlangıç gücü
-        
-        // Güç göstergesini görünür yap
-        if (this.powerBar) {
-            this.powerBar.visible = true;
-        }
+        this.power = 20;
     }
     
-    fire() {
-        // Şarj edilmiyorsa veya soğuma süreci içerisindeyse ateş etme
-        if (!this.charging || this.cooldown > 0 || !this.loadedStone) return null;
-        
-        this.charging = false;
-        this.animating = true;
-        this.animationTime = 0;
-        this.cooldown = 2; // 2 saniyelik soğuma süresi
-        
-        // Güç göstergesini gizle
-        if (this.powerBar) {
-            this.powerBar.visible = false;
-        }
-        
-        // Atış açısını (radyan) hesapla
-        const verticalAngle = THREE.MathUtils.degToRad(this.fireAngle);
-        
-        // Calculate firing direction based on catapult angle and fire angle
-        const direction = new THREE.Vector3(
-            Math.sin(this.angle) * Math.cos(verticalAngle),
-            Math.sin(verticalAngle),
-            Math.cos(this.angle) * Math.cos(verticalAngle)
-        ).normalize();
-        
-        // Yüklü taşı al
-        const stone = this.loadedStone;
-        
-        // Taşı statik olmayan, fırlatılmış olarak işaretle
-        stone.isStatic = false;
-        stone.isLaunched = true;
-        
-        // Set velocity based on power and direction
-        stone.velocity.copy(direction).multiplyScalar(this.power * 0.1);
-        
-        // Taşın artık mancınığın parçası olmadığını işaretle
-        this.loadedStone = null;
-        
-        // Fırlatılan taşı listeye ekle
-        this.firedStones.push(stone);
-        
-        // Taşı döndür
-        stone.addRotation();
-        
-        return stone;
-    }
-    
-    // Mancınığa yeni taş yükleme metodu
-    loadStone() {
-        // Eğer zaten yüklü taş varsa, yeni taş yükleme
-        if (this.loadedStone) return;
-        
-        // Kovadaki pozisyonu al
-        const bucketPos = this.getBucketPosition();
-        
-        // Yeni taş oluştur
-        const stone = new Stone(this.scene, bucketPos);
-        stone.load();
-        
-        // Taşı mancınığın yüklü taşı olarak referansla
-        this.loadedStone = stone;
-    }
-    
-    // Kovanın dünya koordinatlarındaki pozisyonunu alma
-    getBucketPosition() {
-        if (!this.bucket || !this.model) {
-            // Mancınık modeli henüz yüklenmemişse varsayılan değer
-            return new THREE.Vector3(
-                this.position.x,
-                this.position.y + 1,
-                this.position.z
-            );
-        }
-        
-        // Kovanın dünya pozisyonunu al
-        const bucketPos = new THREE.Vector3();
-        this.bucket.getWorldPosition(bucketPos);
-        
-        // Hafif yukarıda olacak şekilde offset ekle
-        bucketPos.y += 0.1;
-        
-        return bucketPos;
-    }
-    
-    initHelpers() {
-        // Güç göstergesi oluşturma
-        const powerBarGeometry = new THREE.BoxGeometry(0.1, 1, 0.1);
-        const powerBarMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff0000,
-            transparent: true,
-            opacity: 0.7
-        });
-        this.powerBar = new THREE.Mesh(powerBarGeometry, powerBarMaterial);
-        this.powerBar.position.set(0, 0.5, -2); // Mancınığın önünde
-        this.powerBar.scale.y = 0.1; // Başlangıçta küçük
-        this.model.add(this.powerBar);
-        
-        // Nişan yardımcısı oluşturma
-        const aimHelperGeometry = new THREE.BufferGeometry();
-        const numPoints = 50;
-        const positions = new Float32Array(numPoints * 3);
-        aimHelperGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        
-        const aimHelperMaterial = new THREE.LineBasicMaterial({
-            color: 0xffff00,
-            opacity: 0.7,
-            transparent: true
-        });
-        
-        this.aimHelper = new THREE.Line(aimHelperGeometry, aimHelperMaterial);
-        this.scene.add(this.aimHelper);
-        
-        this.updateAimHelper();
-    }
-    
-    updateAimHelper() {
-        if (!this.aimHelper) return;
-        
-        // Nişan çizgisini güncelle
-        const numPoints = 50;
-        const positions = this.aimHelper.geometry.attributes.position.array;
-        
-        // Atış açısı (radyan)
-        const verticalAngle = THREE.MathUtils.degToRad(this.fireAngle);
-        
-        // Başlangıç pozisyonu
-        const startPos = this.getBucketPosition();
-        
-        // Atış yönü (mancınık açısına göre)
-        const direction = new THREE.Vector3(
-            Math.sin(this.angle),
-            Math.sin(verticalAngle),
-            Math.cos(this.angle)
-        ).normalize();
-        
-        // Atış hızı
-        const velocity = direction.clone().multiplyScalar(this.power * 0.1);
-        
-        // Yerçekimi
-        const gravity = this.scene.gravity.clone();
-        
-        // Eğri noktalarını hesapla
-        for (let i = 0; i < numPoints; i++) {
-            const t = i * 0.1; // zaman adımı
+    loadStone(stone) {
+        if (!this.hasStone && stone && !stone.isLaunched) {
+            this.hasStone = true;
+            this.loadedStone = stone;
             
-            // v0*t + 0.5*a*t^2 formülüyle pozisyonu hesapla
-            const x = startPos.x + velocity.x * t;
-            const y = startPos.y + velocity.y * t + 0.5 * gravity.y * t * t;
-            const z = startPos.z + velocity.z * t;
+            // Taşı mancınığın kovasına yerleştir
+            if (this.bucket && stone.mesh) {
+                stone.mesh.position.copy(this.bucket.position);
+                stone.mesh.position.y += 0.2; // Kovadan biraz yukarıda
+            }
             
-            // Pozisyonu diziye yaz
-            positions[i * 3] = x;
-            positions[i * 3 + 1] = y;
-            positions[i * 3 + 2] = z;
+            return true;
         }
-        
-        // Geometriyi güncelle
-        this.aimHelper.geometry.attributes.position.needsUpdate = true;
+        return false;
+    }
+    
+    launch() {
+        if (this.hasStone && this.loadedStone) {
+            const stone = this.loadedStone;
+            this.hasStone = false;
+            this.loadedStone = null;
+            
+            // Taşı fırlat
+            stone.isLaunched = true;
+            
+            // Mancınık animasyonunu başlat
+            this.animating = true;
+            this.animationTime = 0;
+            
+            return stone;
+        }
+        return null;
     }
 }
 
 export class Stone {
     constructor(scene, position) {
         this.scene = scene;
-        this.mesh = null; // Renamed from model for consistency
+        this.mesh = null;
         
-        // Eğer pozisyon belirtilmişse o pozisyonu kullan, belirtilmemişse boş vektör oluşturma
         if (position) {
             this.position = position.clone();
         } else {
-            // Pozisyon belirtilmemiş, varsayılan değer atama
             this.position = null;
         }
-          this.velocity = new THREE.Vector3();
-        this.radius = 0.25; // Daha küçük taş yarıçapı (0.3 -> 0.25)
-        this.lifetime = 10; // Seconds before despawning
+        
+        this.velocity = new THREE.Vector3();
+        this.radius = 0.5; // Yarıçapı artırdık (0.25 -> 0.5)
+        this.lifetime = 10;
         this.active = true;
-        this.isStatic = true; // Varsayılan olarak statik (yerçekiminden etkilenmez)
-        this.isLaunched = false; // Fırlatılıp fırlatılmadığı
+        this.isStatic = true;
+        this.isLaunched = false;
+        this.isCollected = false; // Toplama durumu için yeni özellik
     }
       load() {
-        // Eğer pozisyon değeri yoksa, bu taşı yükleme
+        console.log("Stone.load() çağrıldı, pozisyon:", this.position);
+        
         if (!this.position) {
             console.log("Taş yüklenmedi: pozisyon belirtilmemiş");
             return;
         }
         
-        // GLTF model yüklemeyi dene
         const gltfLoader = new GLTFLoader();
         gltfLoader.load('./models/stone.glb', (gltf) => {
+            console.log("Stone modeli başarıyla yüklendi");
             this.mesh = gltf.scene;
             this.mesh.position.copy(this.position);
-            this.mesh.scale.set(0.2, 0.2, 0.2); // Boyutu küçült
+            this.mesh.scale.set(0.4, 0.4, 0.4); // Boyutu artırdık
             
             this.mesh.traverse((child) => {
                 if (child.isMesh) {
@@ -417,18 +223,28 @@ export class Stone {
                 }
             });
             
-            this.scene.add(this.mesh); // Fixed: using add instead of addObject
-        }, undefined, (error) => {
-            // Yüklenemezse basit küreyi kullan
-            console.error("Taş modeli yüklenirken hata:", error);
-            const geometry = new THREE.SphereGeometry(this.radius, 16, 16);
-            const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
-            this.mesh = new THREE.Mesh(geometry, material);
+            this.scene.scene.add(this.mesh); // SceneManager'dan scene'e erişim
+            console.log("Taş sahneye eklendi");
+        }, undefined, (error) => {            console.error("Taş modeli yüklenirken hata:", error);
+            console.log("Fallback küre geometrisi oluşturuluyor");
+              const geometry = new THREE.SphereGeometry(1.2, 32, 32); // Çok büyük boyut (0.8'den 1.2'ye)
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0xFF4444,  // Parlak kırmızı renk
+                roughness: 0.3,
+                metalness: 0.1,
+                emissive: 0x441111, // Hafif kırmızı ışıma
+                emissiveIntensity: 0.3
+            });            this.mesh = new THREE.Mesh(geometry, material);
             this.mesh.position.copy(this.position);
             this.mesh.castShadow = true;
-            this.scene.add(this.mesh); // Fixed: using add instead of addObject
+            this.scene.scene.add(this.mesh); // SceneManager'dan scene'e erişim
+            console.log("Fallback taş sahneye eklendi, pozisyon:", this.position);
+            console.log("Taş mesh ID:", this.mesh.uuid);
+            console.log("Sahne çocuk sayısı (taş eklendikten sonra):", this.scene.scene.children.length);
         });
-    }    update(deltaTime) {
+    }
+    
+    update(deltaTime) {
         // Eğer mesh yoksa veya pozisyon atanmamışsa işlem yapma
         if (!this.mesh || !this.position) return;
         
@@ -505,31 +321,6 @@ export class Stone {
         
         // Hızını ayarla
         this.velocity.copy(direction).multiplyScalar(power);
-    }
-    
-    // Taş fırlatıldığında dönüş eklemek için
-    addRotation() {
-        if (!this.mesh) return;
-        
-        // Dönüş hızı
-        this.rotationSpeed = {
-            x: (Math.random() - 0.5) * 2, // -1 ile 1 arasında rastgele değer
-            y: (Math.random() - 0.5) * 2,
-            z: (Math.random() - 0.5) * 2
-        };
-        
-        // Update fonksiyonunu genişlet ve dönüşü ekle
-        const originalUpdate = this.update.bind(this);
-        this.update = (deltaTime) => {
-            originalUpdate(deltaTime);
-            
-            // Dönüşü uygula
-            if (this.mesh && this.rotationSpeed && !this.isStatic) {
-                this.mesh.rotation.x += this.rotationSpeed.x * deltaTime;
-                this.mesh.rotation.y += this.rotationSpeed.y * deltaTime;
-                this.mesh.rotation.z += this.rotationSpeed.z * deltaTime;
-            }
-        };
     }
 }
 
@@ -664,5 +455,146 @@ export class Torch {
         }
         
         return wasLit;
+    }
+}
+
+export class HandTorch {
+    constructor(scene) {
+        this.scene = scene;
+        this.model = null;
+        this.light = null;
+        this.flame = null;
+        this.intensity = 6;
+        this.color = 0xff6a00;
+        this.isActive = false;
+        this.flickerSpeed = 0.8;
+        this.flickerIntensity = 0.3;
+        this.time = 0;
+    }
+    
+    create() {
+        // Basit meşale modeli oluştur
+        const group = new THREE.Group();
+        
+        // Sap
+        const handleGeometry = new THREE.CylinderGeometry(0.02, 0.03, 0.4);
+        const handleMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+        const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+        handle.position.y = -0.2;
+        group.add(handle);
+        
+        // Meşale başı
+        const torchGeometry = new THREE.CylinderGeometry(0.05, 0.03, 0.15);
+        const torchMaterial = new THREE.MeshStandardMaterial({ color: 0x654321 });
+        const torchHead = new THREE.Mesh(torchGeometry, torchMaterial);
+        torchHead.position.y = 0.075;
+        group.add(torchHead);
+        
+        // Işık
+        this.light = new THREE.PointLight(this.color, this.intensity, 8);
+        this.light.position.y = 0.15;
+        this.light.castShadow = true;
+        this.light.shadow.mapSize.width = 512;
+        this.light.shadow.mapSize.height = 512;
+        group.add(this.light);
+        
+        // Alev efekti
+        const flameGeometry = new THREE.ConeGeometry(0.04, 0.1, 6);
+        const flameMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xff4500,
+            transparent: true,
+            opacity: 0.8
+        });
+        this.flame = new THREE.Mesh(flameGeometry, flameMaterial);
+        this.flame.position.y = 0.15;
+        group.add(this.flame);
+          this.model = group;
+        
+        return group;
+    }
+      updatePosition(camera) {
+        if (!this.model || !this.isActive || !camera) return;
+        
+        // Kameranın sağ alt köşesine yerleştir
+        const cameraDirection = new THREE.Vector3();
+        camera.getWorldDirection(cameraDirection);
+        
+        const rightVector = new THREE.Vector3();
+        rightVector.crossVectors(camera.up, cameraDirection).normalize();
+        
+        const position = camera.position.clone();
+        position.add(rightVector.multiplyScalar(0.3)); // Sağa
+        position.add(cameraDirection.multiplyScalar(0.5)); // Öne
+        position.y -= 0.2; // Aşağı
+        
+        this.model.position.copy(position);
+        
+        // Kamera yönüne bakacak şekilde döndür
+        this.model.lookAt(
+            position.x + cameraDirection.x,
+            position.y + cameraDirection.y,
+            position.z + cameraDirection.z
+        );
+    }
+    
+    update(deltaTime, camera) {
+        if (!this.isActive || !this.model) return;
+        
+        this.time += deltaTime;
+        this.updatePosition(camera);
+        
+        // Titreme efekti
+        const flicker = Math.sin(this.time * this.flickerSpeed) * this.flickerIntensity;
+        
+        if (this.light) {
+            this.light.intensity = this.intensity * (1 + flicker);
+        }
+        
+        if (this.flame) {
+            const scale = 1 + flicker * 0.5;
+            this.flame.scale.set(scale, scale, scale);
+        }
+    }
+
+    show() {
+        this.isActive = true;
+        
+        if (!this.model) {
+            this.scene.scene.add(this.create());
+        } else {
+            this.model.visible = true;
+        }
+    }
+
+    hide() {
+        this.isActive = false;
+        
+        if (this.model) {
+            this.model.visible = false;
+        }
+    }
+    
+    toggle() {
+        this.isActive = !this.isActive;
+        
+        if (this.isActive) {
+            if (!this.model) {
+                this.scene.scene.add(this.create());
+            } else {
+                this.model.visible = true;
+            }
+        } else if (this.model) {
+            this.model.visible = false;
+        }
+        
+        return this.isActive;
+    }
+    
+    remove() {
+        if (this.model) {
+            this.scene.scene.remove(this.model);
+            this.model = null;
+        }
+        this.isActive = false;
     }
 }

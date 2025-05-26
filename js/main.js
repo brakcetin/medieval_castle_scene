@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as dat from 'dat.gui';
 import { SceneManager } from './scene.js';
-import { Catapult, Stone, Torch } from './objects.js';
+import { Catapult, Stone, Torch, HandTorch } from './objects.js';
 
 // Ana uygulama sınıfı
 class App {
@@ -25,22 +26,37 @@ class App {
         // Zaman takibi
         this.clock = new THREE.Clock();
         this.deltaTime = 0;
-        
-        // Işık ve gökyüzü ayarları
+          // Işık ve gökyüzü ayarları
         this.isDay = true;
         this.gui = null;
+        this.timeOfDay = 12; // 0-24 saat arası (12 = öğlen)
+        this.sunAngle = 0; // Güneşin açısı
         
-        // Kamera ayarları
-        this.cameraSpeed = 5;
-        this.cameraRotationSpeed = 1.5;
-        this.isCameraLocked = false; // Kamera kontrollerini kilitleme durumu
-        this.cameraMode = 'free'; // Kamera modu (free, follow, overhead)
+        // Özel meşale
+        this.handTorch = null;
+        this.hasHandTorch = false;
         
         // Kaynaklar
         this.resources = {
             models: {},
             textures: {}
         };
+        
+        // Kamera ayarları
+        this.cameraSpeed = 5;
+        this.cameraRotationSpeed = 0.002;
+        this.moveForward = false;
+        this.moveBackward = false;
+        this.moveLeft = false;
+        this.moveRight = false;
+        this.canRotate = false;
+          // Etkileşim için yeni değişkenler
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        
+        // Mancınık etkileşim sistemi
+        this.playerInventory = { hasRock: false };
+        this.catapultState = 'empty'; // 'empty', 'loaded', 'ready'
         
         // Başlatma
         this.init();
@@ -55,51 +71,65 @@ class App {
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.shadowMap.enabled = true;
-        
-        // Kamera oluşturma
+          // Kamera oluşturma
         this.camera = new THREE.PerspectiveCamera(
             75, 
             window.innerWidth / window.innerHeight,
             0.1,
             1000
         );
-        
-        // Kontroller oluşturma
-        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.05;
-        this.controls.maxPolarAngle = Math.PI / 2 - 0.1; // Yerden geçmemesi için sınırlama
-        
-        // Scene Manager oluşturma
+        this.camera.position.set(0, 0.8, 10); // Kamera yüksekliğini düşürdük (1.6'dan 0.8'e)
+        this.camera.lookAt(0, 0.8, 0);
+        console.log("Kamera pozisyonu:", this.camera.position);
+          // Scene Manager oluşturma
         this.sceneManager = new SceneManager(this.renderer, this.camera);
         
-        // Yardım paneli için DOM elementleri
-        this.helpPanel = document.getElementById('controls-help');
-        this.helpToggle = document.getElementById('help-toggle');
-        this.closeHelp = document.getElementById('close-help');
+        // El meşalesini oluştur
+        this.handTorch = new HandTorch(this.sceneManager, this.camera);
+          // Reset fonksiyonu - tüm sahneyi temizler ve yeniden oluşturur
+        window.resetScene = async () => {
+            console.log("Sahne sıfırlanıyor...");
+            
+            // AssetLoader'ı temizle ve sıfırla
+            try {
+                const { assetLoader } = await import('./AssetLoader.js');
+                console.log("Asset önbelleği temizleniyor...");
+                assetLoader.clearCache();
+            } catch (error) {
+                console.warn("AssetLoader temizlenemedi:", error);
+            }
+            
+            // Eski SceneManager'ı temizle
+            if (this.sceneManager && this.sceneManager.scene) {
+                console.log("SceneManager temizleniyor...");
+                this.sceneManager.cleanupScene();
+            }
+            
+            // Eski SceneManager'ı yok et
+            this.sceneManager = null;
+            
+            // Yeni bir SceneManager oluştur
+            console.log("Yeni SceneManager oluşturuluyor...");
+            this.sceneManager = new SceneManager(this.renderer, this.camera);
+            
+            console.log("Sahne sıfırlandı");
+            
+            // Score'u sıfırla
+            this.score = 0;
+            if (this.scoreElement) {
+                this.scoreElement.textContent = "0";
+            }
+        };
         
         // Olay dinleyiciler
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
-        window.addEventListener('keydown', (e) => { this.keys[e.code] = true; });
-        window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
+        window.addEventListener('keydown', this.onKeyDown.bind(this));
+        window.addEventListener('keyup', this.onKeyUp.bind(this));
+        window.addEventListener('mousedown', this.onMouseDown.bind(this));
+        window.addEventListener('mouseup', this.onMouseUp.bind(this));
+        window.addEventListener('mousemove', this.onMouseMove.bind(this));
         this.dayNightToggle.addEventListener('click', this.toggleDayNight.bind(this));
-        
-        // Yardım paneli olay dinleyicileri
-        if (this.helpToggle) {
-            this.helpToggle.addEventListener('click', () => {
-                this.helpPanel.classList.toggle('hidden');
-                // Yardım paneli açıkken kontrolleri devre dışı bırak
-                this.controls.enabled = this.helpPanel.classList.contains('hidden');
-            });
-        }
-        
-        if (this.closeHelp) {
-            this.closeHelp.addEventListener('click', () => {
-                this.helpPanel.classList.add('hidden');
-                // Panel kapandığında kontrolleri etkinleştir
-                this.controls.enabled = true;
-            });
-        }
+        window.addEventListener('click', this.onClick.bind(this));
         
         // GUI oluşturma
         this.setupGUI();
@@ -109,9 +139,50 @@ class App {
         
         // Animasyon döngüsünü başlat
         this.animate();
-    }
-      setupGUI() {
-        this.gui = new dat.GUI();
+    }    setupGUI() {
+        console.log("setupGUI çağrıldı - HTML kontrolleri bağlanıyor...");
+        
+        // HTML slider kontrolleri
+        const timeSlider = document.getElementById('time-slider');
+        const timeDisplay = document.getElementById('time-display');
+        
+        if (timeSlider && timeDisplay) {
+            timeSlider.addEventListener('input', (event) => {
+                const value = parseFloat(event.target.value);
+                this.timeOfDay = value;
+                timeDisplay.textContent = value.toFixed(1);
+                this.updateTimeOfDay(value);
+            });
+            console.log("HTML time slider bağlandı");
+        } else {
+            console.error("Time slider elementleri bulunamadı");
+        }
+        
+        // dat.GUI'yi de deneyebiliriz (varsa)
+        try {
+            if (typeof dat !== 'undefined') {
+                this.gui = new dat.GUI();
+                console.log("dat.GUI başarıyla oluşturuldu");
+                
+                // Zaman Kontrolü
+                const timeFolder = this.gui.addFolder('Zaman Ayarları');
+                const timeSettings = {
+                    saatAyarı: 12
+                };
+                
+                timeFolder.add(timeSettings, 'saatAyarı', 0, 24).onChange((value) => {
+                    this.timeOfDay = value;
+                    this.updateTimeOfDay(value);
+                    // HTML slider'ı da güncelle
+                    if (timeSlider) timeSlider.value = value;
+                    if (timeDisplay) timeDisplay.textContent = value.toFixed(1);
+                });
+                timeFolder.open();
+                console.log("dat.GUI zaman kontrol slider'ı eklendi");
+            }
+        } catch (error) {
+            console.log("dat.GUI yüklenemedi, HTML kontrolleri kullanılıyor:", error.message);
+        }
         
         // Işık ayarları
         const lightFolder = this.gui.addFolder('Işık Ayarları');
@@ -135,14 +206,10 @@ class App {
             }
         });
         
-        lightFolder.open();
-        
         // Mancınık ayarları
         const catapultFolder = this.gui.addFolder('Mancınık Ayarları');
         const catapultSettings = {
-            maxPower: 100,
-            fireAngle: 45,
-            gravity: 9.81
+            maxPower: 100
         };
         
         catapultFolder.add(catapultSettings, 'maxPower', 50, 200).onChange((value) => {
@@ -151,48 +218,99 @@ class App {
             }
         });
         
-        catapultFolder.add(catapultSettings, 'fireAngle', 15, 75).onChange((value) => {
-            if (this.sceneManager.objects.catapult) {
-                this.sceneManager.objects.catapult.fireAngle = value;
-            }
-        });
-        
-        catapultFolder.add(catapultSettings, 'gravity', 5, 15).onChange((value) => {
-            if (this.sceneManager.scene) {
-                this.sceneManager.gravity.y = -value;
-            }
-        });
-        
-        catapultFolder.open();
-        
         // Kamera ayarları
         const cameraFolder = this.gui.addFolder('Kamera Ayarları');
         const cameraSettings = {
-            speed: this.cameraSpeed,
-            rotationSpeed: this.cameraRotationSpeed,
-            mode: this.cameraMode,
-            lockCamera: this.isCameraLocked
+            speed: 5
         };
         
-        cameraFolder.add(cameraSettings, 'speed', 1, 10).onChange((value) => {
-            this.cameraSpeed = value;
-        });
+        cameraFolder.add(cameraSettings, 'speed', 1, 10);
+    }
+    
+    // Saate göre gün/gece döngüsü
+    updateTimeOfDay(hour) {
+        // Gece: 20-6 arası, Gündüz: 6-20 arası
+        if (hour >= 20 || hour <= 6) {
+            // Gece modu
+            this.isDay = false;
+            this.sceneManager.scene.background = new THREE.Color(0x000033);
+            
+            if (this.sceneManager.directionalLight) {
+                this.sceneManager.directionalLight.intensity = 0.1;
+            }
+            if (this.sceneManager.ambientLight) {
+                this.sceneManager.ambientLight.intensity = 0.2;
+            }
+            
+            // Meşaleleri parlat
+            if (this.sceneManager.objects.torches) {
+                this.sceneManager.objects.torches.forEach(torch => {
+                    torch.setIntensity(5);
+                });
+            }
+            
+            this.sceneManager.scene.fog = new THREE.FogExp2(0x000033, 0.01);
+            this.dayNightToggle.textContent = "Gündüze Geç";
+        } else {
+            // Gündüz modu - güneş pozisyonunu hesapla
+            this.isDay = true;
+            
+            // Saat 6-18 arası güneş hareketi (0-180 derece)
+            const normalizedHour = Math.max(6, Math.min(18, hour));
+            this.sunAngle = ((normalizedHour - 6) / 12) * Math.PI; // 0 - PI arası
+            
+            // Güneş pozisyonu
+            if (this.sceneManager.directionalLight) {
+                const x = Math.sin(this.sunAngle) * 100;
+                const y = Math.cos(this.sunAngle) * 100 + 50;
+                const z = 50;
+                
+                this.sceneManager.directionalLight.position.set(x, y, z);
+                
+                // Güneş yüksekliğine göre parlaklık
+                const intensity = Math.max(0.3, Math.cos(this.sunAngle - Math.PI/2) * 0.8);
+                this.sceneManager.directionalLight.intensity = intensity;
+            }
+            
+            // Gökyüzü rengi - güneş pozisyonuna göre
+            const skyIntensity = Math.max(0.2, Math.cos(this.sunAngle - Math.PI/2));
+            const skyColor = new THREE.Color().setHSL(0.6, 0.6, 0.4 + skyIntensity * 0.4);
+            this.sceneManager.scene.background = skyColor;
+            
+            if (this.sceneManager.ambientLight) {
+                this.sceneManager.ambientLight.intensity = 0.3 + skyIntensity * 0.3;
+            }
+            
+            // Meşaleleri söndür
+            if (this.sceneManager.objects.torches) {
+                this.sceneManager.objects.torches.forEach(torch => {
+                    torch.setIntensity(1);
+                });
+            }
+              this.sceneManager.scene.fog = new THREE.FogExp2(0xcccccc, 0.005);
+            this.dayNightToggle.textContent = "Geceye Geç";
+        }
+    }
+
+    toggleHandTorch() {
+        if (!this.handTorch) {
+            // İlk kez F tuşuna basıldığında el meşalesini oluştur
+            this.handTorch = new HandTorch(this.sceneManager);
+            console.log("El meşalesi oluşturuldu!");
+        }
         
-        cameraFolder.add(cameraSettings, 'rotationSpeed', 0.5, 3).onChange((value) => {
-            this.cameraRotationSpeed = value;
-        });
+        this.hasHandTorch = !this.hasHandTorch;
         
-        cameraFolder.add(cameraSettings, 'mode', ['free', 'follow', 'overhead']).onChange((value) => {
-            this.setCameraMode(value);
-        });
-        
-        cameraFolder.add(cameraSettings, 'lockCamera').onChange((value) => {
-            this.isCameraLocked = value;
-            this.controls.enabled = !value;
-        });
-        
-        cameraFolder.open();
-    }async loadModels() {
+        if (this.hasHandTorch) {
+            this.handTorch.show();
+            console.log("El meşalesi açıldı!");
+        } else {
+            this.handTorch.hide();
+            console.log("El meşalesi kapatıldı!");
+        }
+    }
+
+    async loadModels() {
         // Yükleme ekranını göster
         if (this.loadingElement) {
             this.loadingElement.style.display = 'block';
@@ -206,11 +324,15 @@ class App {
             console.log("Tüm modeller AssetLoader ile yükleniyor...");
             await assetLoader.preloadAllModels();
               // Scene Manager aracılığıyla sahneyi yükle
-            await this.sceneManager.loadCastle();
-              // Mancınık SceneManager tarafından initializeCatapult() metodu ile oluşturulacak
+            await this.sceneManager.loadCastle();            // Mancınık SceneManager tarafından initializeCatapult() metodu ile oluşturulacak
             await this.sceneManager.initializeCatapult();
             console.log("Mancınık SceneManager tarafından oluşturuldu");
-              // NOT: Meşaleler artık sadece scene.js içindeki createTorches() metodu ile oluşturuluyor
+            
+            // Mancınık yüklendikten sonra taşları oluştur
+            await this.sceneManager.createStones();
+            console.log("Taşlar mancınık yüklendikten sonra oluşturuldu");
+            
+            // NOT: Meşaleler artık sadece scene.js içindeki createTorches() metodu ile oluşturuluyor
             // NOT: Taşlar artık sadece scene.js içindeki createStones() metodu ile oluşturuluyor
             
             // Bu kısımda taş oluşturma kodu kaldırıldı - kalenin ortasındaki taş sorununu çözüyor
@@ -231,9 +353,8 @@ class App {
     // Eski yöntem model yükleme (AssetLoader çalışmazsa)
     loadModelsLegacy() {
         console.log("Modeller klasik yöntemle yükleniyor...");
-        
-        const gltfLoader = new GLTFLoader();
-        let totalModels = 4; // kale, mancınık, taş, meşale
+          const gltfLoader = new GLTFLoader();
+        let totalModels = 3; // kale, mancınık+taşlar, meşaleler
         let loadedModels = 0;
         
         // Yükleme tamamlandığında kontrol
@@ -274,13 +395,17 @@ class App {
         }, undefined, (error) => {
             console.error('Kale modeli yüklenirken hata oluştu:', error);
             checkLoaded();
-        });
-          // Mancınık modelini SceneManager ile yükle
+        });        // Mancınık modelini SceneManager ile yükle
         this.sceneManager.initializeCatapult().then(() => {
             console.log("Mancınık SceneManager tarafından yüklendi (legacy mode)");
+            
+            // Mancınık yüklendikten sonra taşları oluştur
+            return this.sceneManager.createStones();
+        }).then(() => {
+            console.log("Taşlar mancınık yüklendikten sonra oluşturuldu (legacy mode)");
             checkLoaded();
         }).catch(error => {
-            console.error("Mancınık yüklenirken hata oluştu:", error);
+            console.error("Mancınık veya taşlar yüklenirken hata oluştu:", error);
             checkLoaded();
         });
           // Meşaleler scene.js içindeki createTorches() metodu ile oluşturuluyor
@@ -290,13 +415,6 @@ class App {
             checkLoaded();
         }).catch(error => {
             console.error("Meşaleler yüklenirken hata oluştu:", error);
-            checkLoaded();
-        });        // Taşlar scene.js içindeki createStones() metodu ile oluşturuluyor
-        this.sceneManager.createStones().then(() => {
-            console.log("Taşlar SceneManager tarafından yüklendi (legacy mode)");
-            checkLoaded();
-        }).catch(error => {
-            console.error("Taşlar yüklenirken hata oluştu:", error);
             checkLoaded();
         });
     }
@@ -349,105 +467,356 @@ class App {
             this.dayNightToggle.textContent = "Gündüze Geç";
         }
     }
-      handleInput() {
-        // Mancınık kontrolü
-        const catapult = this.sceneManager.objects.catapult;
-        if (catapult) {
-            // Yatay dönüş (sağa/sola)
-            if (this.keys['ArrowLeft']) {
-                catapult.rotate(1);
-            }
-            if (this.keys['ArrowRight']) {
-                catapult.rotate(-1);
-            }
-            
-            // Dikey atış açısı kontrolü (yukarı/aşağı)
-            if (this.keys['ArrowUp']) {
-                catapult.adjustFireAngle(1); // Açıyı artır = daha yükseğe atış
-            }
-            if (this.keys['ArrowDown']) {
-                catapult.adjustFireAngle(-1); // Açıyı azalt = daha alçağa atış
-            }
-            
-            // Şarj etme ve ateşleme
-            if (this.keys['Space'] && !this.spacePressed) {
-                this.spacePressed = true;
-                catapult.startCharging();
-            }
-            if (!this.keys['Space'] && this.spacePressed) {
-                this.spacePressed = false;
-                const stone = catapult.fire();
-                if (stone) {
-                    this.sceneManager.objects.stones.push(stone);
-                }
-            }
-        }
-
-        // Kamera kontrolleri
-        if (!this.isCameraLocked) {
-            const moveSpeed = this.cameraSpeed * this.deltaTime;
-            const rotateSpeed = this.cameraRotationSpeed * this.deltaTime;
-            
-            // Kamera modu kontrolü
-            if (this.keys['Digit1']) {
-                this.setCameraMode('free');
-            } else if (this.keys['Digit2']) {
-                this.setCameraMode('follow');
-            } else if (this.keys['Digit3']) {
-                this.setCameraMode('overhead');
-            }
-            
-            // Kamera kilit kontrolü
-            if (this.keys['KeyL'] && !this.lKeyPressed) {
-                this.lKeyPressed = true;
-                this.toggleCameraLock();
-            }
-            if (!this.keys['KeyL'] && this.lKeyPressed) {
-                this.lKeyPressed = false;
-            }
-
-            // Serbest kamera modu kontrolü
-            if (this.cameraMode === 'free') {
-                // WASD ile ileri, geri, sola, sağa hareket
-                if (this.keys['KeyW']) {
-                    this.moveCamera('forward', moveSpeed);
-                }
-                if (this.keys['KeyS']) {
-                    this.moveCamera('backward', moveSpeed);
-                }
-                if (this.keys['KeyA']) {
-                    this.moveCamera('left', moveSpeed);
-                }
-                if (this.keys['KeyD']) {
-                    this.moveCamera('right', moveSpeed);
-                }
-                
-                // Q ve E ile yukarı ve aşağı hareket
-                if (this.keys['KeyQ']) {
-                    this.moveCamera('up', moveSpeed);
-                }
-                if (this.keys['KeyE']) {
-                    this.moveCamera('down', moveSpeed);
-                }
-                
-                // Yön tuşları ile dönüş (kamera yönünü değiştirme)
-                if (this.keys['KeyZ']) {
-                    this.rotateCamera('left', rotateSpeed);
-                }
-                if (this.keys['KeyC']) {
-                    this.rotateCamera('right', rotateSpeed);
-                }
-                if (this.keys['KeyR']) {
-                    this.rotateCamera('up', rotateSpeed);
-                }
-                if (this.keys['KeyF']) {
-                    this.rotateCamera('down', rotateSpeed);
-                }
-            }
+      onKeyDown(event) {
+        switch (event.code) {
+            case 'KeyW':
+                this.moveForward = true;
+                break;
+            case 'KeyS':
+                this.moveBackward = true;
+                break;
+            case 'KeyA':
+                this.moveLeft = true;
+                break;
+            case 'KeyD':
+                this.moveRight = true;
+                break;
+            case 'KeyF':
+                this.toggleHandTorch();
+                break;
         }
     }
     
-    animate() {
+    onKeyUp(event) {
+        switch (event.code) {
+            case 'KeyW':
+                this.moveForward = false;
+                break;
+            case 'KeyS':
+                this.moveBackward = false;
+                break;
+            case 'KeyA':
+                this.moveLeft = false;
+                break;
+            case 'KeyD':
+                this.moveRight = false;
+                break;
+        }
+    }
+    
+    onMouseDown(event) {
+        if (event.button === 0) { // Sol tık
+            this.canRotate = true;
+            document.body.requestPointerLock();
+        }
+    }
+    
+    onMouseUp(event) {
+        if (event.button === 0) { // Sol tık
+            this.canRotate = false;
+            document.exitPointerLock();
+        }
+    }
+      onMouseMove(event) {
+        if (this.canRotate) {
+            const movementX = event.movementX || 0;
+            const movementY = event.movementY || 0;
+            
+            // Yatay rotasyon (sağa/sola bakma)
+            this.camera.rotation.y -= movementX * this.cameraRotationSpeed;
+            
+            // Dikey rotasyon (yukarı/aşağı bakma) - sınırlı açıda
+            const verticalRotation = this.camera.rotation.x - movementY * this.cameraRotationSpeed;
+            // Yukarı/aşağı bakma açısını sınırla (-45 ile 45 derece arası)
+            this.camera.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, verticalRotation));
+        } else {
+            // Cursor değiştirme için mouse pozisyonunu kontrol et
+            this.updateCursor(event);
+        }
+    }
+    
+    // Cursor'ı güncelleyen metod
+    updateCursor(event) {
+        // Mouse pozisyonunu normalize et
+        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        // Raycaster'ı güncelle
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        
+        // Tüm nesneleri kontrol et
+        const intersects = this.raycaster.intersectObjects(this.sceneManager.scene.children, true);
+        
+        let isHoveringClickable = false;
+        
+        if (intersects.length > 0) {
+            const hoveredObject = intersects[0].object;
+            
+            // Kayalar üzerindeyken
+            for (let stone of this.sceneManager.objects.stones) {
+                if (stone.mesh === hoveredObject && stone.isStatic && !stone.isCollected) {
+                    isHoveringClickable = true;
+                    break;
+                }
+            }
+            
+            // Mancınık üzerindeyken
+            const catapult = this.sceneManager.objects.catapult;
+            if (catapult && catapult.model && this.isObjectInGroup(hoveredObject, catapult.model)) {
+                isHoveringClickable = true;
+            }
+        }
+        
+        // Cursor'ı değiştir
+        document.body.style.cursor = isHoveringClickable ? 'pointer' : 'default';
+    }    onClick(event) {
+        console.log("onClick tetiklendi");
+        
+        // Mouse pozisyonunu normalize et
+        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        console.log("Mouse pozisyonu:", this.mouse);
+        
+        // Raycaster'ı güncelle
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        
+        // Tüm nesneleri kontrol et
+        const intersects = this.raycaster.intersectObjects(this.sceneManager.scene.children, true);
+        console.log(`${intersects.length} nesne ile kesişim bulundu`);
+        
+        if (intersects.length > 0) {
+            const clickedObject = intersects[0].object;
+            console.log("Tıklanan nesne:", clickedObject);
+            
+            // 1. KAYALAR - Tıklanabilir kayalara tıklama
+            console.log(`Kontrol edilen taş sayısı: ${this.sceneManager.objects.stones.length}`);
+            for (let i = 0; i < this.sceneManager.objects.stones.length; i++) {
+                const stone = this.sceneManager.objects.stones[i];
+                console.log(`Taş ${i}:`, stone.mesh, "isStatic:", stone.isStatic, "isCollected:", stone.isCollected);
+                
+                if (stone.mesh === clickedObject && stone.isStatic && !stone.isCollected) {
+                    console.log(`Taş ${i} toplandı!`);
+                    this.collectRock(stone);
+                    return;
+                }
+            }
+            
+            // 2. MANCINIQ - Mancınığa tıklama
+            const catapult = this.sceneManager.objects.catapult;
+            if (catapult && catapult.model && this.isObjectInGroup(clickedObject, catapult.model)) {
+                console.log("Mancınığa tıklandı");
+                this.handleCatapultClick();
+                return;
+            }
+        } else {
+            console.log("Hiçbir nesneye tıklanmadı");
+        }
+    }
+    
+    // Bir nesnenin belirli bir grup içinde olup olmadığını kontrol eder
+    isObjectInGroup(object, group) {
+        if (object === group) return true;
+        
+        let parent = object.parent;
+        while (parent) {
+            if (parent === group) return true;
+            parent = parent.parent;
+        }
+        return false;
+    }
+    
+    // Kaya toplama işlemi
+    collectRock(stone) {
+        if (this.playerInventory.hasRock) {
+            this.showMessage("Zaten bir taşın var!");
+            return;
+        }
+        
+        stone.isCollected = true;
+        this.sceneManager.scene.remove(stone.mesh);
+        this.playerInventory.hasRock = true;
+        this.catapultState = 'hasRock';
+        
+        this.showMessage("Taş toplandı! Mancınığa git ve yükle.");
+        this.updateScore(5);
+        
+        console.log("Kaya toplandı");
+    }
+    
+    // Mancınık tıklama işlemleri
+    handleCatapultClick() {
+        const catapult = this.sceneManager.objects.catapult;
+        
+        if (this.playerInventory.hasRock && this.catapultState === 'hasRock') {
+            // Taş var, mancınığa yükle
+            this.loadCatapult();
+        } else if (this.catapultState === 'loaded') {
+            // Mancınık yüklü, fırlat
+            this.fireCatapult();
+        } else if (!this.playerInventory.hasRock) {
+            this.showMessage("Önce bir taş toplaman gerekiyor!");
+        }
+    }
+      // Mancınığa taş yükleme
+    loadCatapult() {
+        this.playerInventory.hasRock = false;
+        this.catapultState = 'loaded';
+        
+        // Mancınığa görsel taş ekle
+        const catapult = this.sceneManager.objects.catapult;
+        if (catapult && catapult.model) {
+            const rockGeometry = new THREE.SphereGeometry(0.2, 8, 6);
+            const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+            const loadedRock = new THREE.Mesh(rockGeometry, rockMaterial);
+            
+            // Taşı mancınık üzerine yerleştir (basit pozisyon)
+            loadedRock.position.set(0, 1.5, -1); // Mancınık modeline göre ayarlanacak
+            loadedRock.name = 'loadedRock';
+            loadedRock.castShadow = true;
+            
+            catapult.model.add(loadedRock);
+        }
+        
+        this.showMessage("Taş yüklendi! Tekrar tıkla ve fırlat!");
+        this.updateScore(10);
+        
+        console.log("Taş mancınığa yüklendi");
+    }
+    
+    // Mancınıktan taş fırlat
+    fireCatapult() {
+        const catapult = this.sceneManager.objects.catapult;
+        const loadedRock = catapult.model.getObjectByName('loadedRock');
+        
+        if (loadedRock) {
+            catapult.model.remove(loadedRock);
+            
+            // Taşı sahneye ekle ve fırlat
+            const worldPosition = new THREE.Vector3();
+            loadedRock.getWorldPosition(worldPosition);
+            loadedRock.position.copy(worldPosition);
+            
+            this.sceneManager.scene.add(loadedRock);
+            this.animateProjectile(loadedRock);
+        }
+        
+        this.catapultState = 'empty';
+        this.showMessage("Taş fırlatıldı! Başka kayalar topla!");
+        this.updateScore(20);
+        
+        console.log("Taş fırlatıldı");
+    }
+    
+    // Projektil animasyonu
+    animateProjectile(projectile) {
+        const startPos = projectile.position.clone();
+        const targetPos = new THREE.Vector3(
+            startPos.x - 15 + Math.random() * 10,
+            0,
+            startPos.z - 8 + Math.random() * 5
+        );
+        
+        let progress = 0;
+        const duration = 2500; // 2.5 saniye
+        const startTime = Date.now();
+        
+        const animate = () => {
+            const currentTime = Date.now();
+            progress = Math.min((currentTime - startTime) / duration, 1);
+            
+            // Parabolik hareket
+            const x = THREE.MathUtils.lerp(startPos.x, targetPos.x, progress);
+            const z = THREE.MathUtils.lerp(startPos.z, targetPos.z, progress);
+            const y = startPos.y + Math.sin(progress * Math.PI) * 6; // Yay hareketi
+            
+            projectile.position.set(x, y, z);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Taş yere düştü
+                projectile.position.y = 0.2;
+                setTimeout(() => {
+                    this.sceneManager.scene.remove(projectile);
+                }, 3000); // 3 saniye sonra temizle
+            }
+        };
+        
+        animate();
+    }
+    
+    // Mesaj gösterme sistemi
+    showMessage(text) {
+        let messageDiv = document.getElementById('game-message');
+        if (!messageDiv) {
+            messageDiv = document.createElement('div');
+            messageDiv.id = 'game-message';
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 100px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 15px 25px;
+                border-radius: 8px;
+                z-index: 1000;
+                font-size: 16px;
+                border: 2px solid #4CAF50;
+                display: none;
+            `;
+            document.body.appendChild(messageDiv);
+        }
+        
+        messageDiv.textContent = text;
+        messageDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            messageDiv.style.display = 'none';
+        }, 3000);
+    }
+    
+    handleInput() {
+        const delta = this.deltaTime;
+        const moveSpeed = this.cameraSpeed * delta;
+        
+        // Kameranın baktığı yönü hesapla
+        const direction = new THREE.Vector3();
+        this.camera.getWorldDirection(direction);
+        direction.y = 0; // Y ekseninde hareketi engelle
+        direction.normalize();
+        
+        // İleri/geri hareket
+        if (this.moveForward) {
+            this.camera.position.addScaledVector(direction, moveSpeed);
+        }
+        if (this.moveBackward) {
+            this.camera.position.addScaledVector(direction, -moveSpeed);
+        }
+        
+        // Sağa/sola hareket için yan vektörü hesapla
+        const rightVector = new THREE.Vector3();
+        rightVector.crossVectors(this.camera.up, direction).normalize();
+        
+        if (this.moveRight) {
+            this.camera.position.addScaledVector(rightVector, -moveSpeed); // D tuşu için yönü ters çevirdik
+        }
+        if (this.moveLeft) {
+            this.camera.position.addScaledVector(rightVector, moveSpeed); // A tuşu için yönü ters çevirdik
+        }
+          // Kameranın y pozisyonunu sabit tut
+        this.camera.position.y = 0.8;
+        
+        // Mancınığa yakınlık kontrolü (artık gerekli değil ama konsolda bilgi için bırakılabilir)
+        const catapult = this.sceneManager.objects.catapult;
+        if (catapult && catapult.model) {
+            const distance = this.camera.position.distanceTo(catapult.model.position);
+            this.isNearCatapult = distance < 6; // 3 birimden 6 birime çıkardık
+        } else {
+            this.isNearCatapult = false;
+        }
+    }
+      animate() {
         requestAnimationFrame(this.animate.bind(this));
         
         this.deltaTime = this.clock.getDelta();
@@ -455,55 +824,14 @@ class App {
         // Kullanıcı girişini işle
         this.handleInput();
         
+        // El meşalesini güncelle
+        if (this.handTorch && this.hasHandTorch) {
+            this.handTorch.update(this.deltaTime, this.camera);
+        }
+        
         // Sahnedeki objeleri güncelle
-        if (this.sceneManager.objects.catapult) {
-            this.sceneManager.objects.catapult.update(this.deltaTime);
-            
-            // Kamera modu takipte ise mancınığı takip et
-            if (this.cameraMode === 'follow' && !this.isCameraLocked) {
-                const catapult = this.sceneManager.objects.catapult;
-                // Mancınığın arkasında ve biraz yukarıda konum
-                this.camera.position.set(
-                    catapult.position.x - 5 * Math.sin(catapult.angle),
-                    catapult.position.y + 3,
-                    catapult.position.z - 5 * Math.cos(catapult.angle)
-                );
-                // Mancınığa bak
-                this.camera.lookAt(catapult.position);
-            }
-        }
-        
-        // Taşları güncelle
-        if (this.sceneManager.objects.stones) {
-            for (let i = this.sceneManager.objects.stones.length - 1; i >= 0; i--) {
-                const stone = this.sceneManager.objects.stones[i];
-                stone.update(this.deltaTime);
-                
-                // Taş aktif değilse veya çok uzağa düştüyse kaldır
-                if (!stone.active || stone.position.y < -10 || 
-                    stone.position.distanceTo(new THREE.Vector3(0, 0, 0)) > 50) {
-                    this.sceneManager.objects.stones.splice(i, 1);
-                }
-                
-                // Aktif taş fırlatıldıysa ve takip modunda isek, fırlatılan taşı takip et
-                if (stone.active && stone.isLaunched && this.cameraMode === 'follow' && !this.isCameraLocked) {
-                    const offset = new THREE.Vector3(0, 2, 5); // Taşın arkasında ve biraz yukarıda
-                    this.camera.position.copy(stone.position).add(offset);
-                    this.camera.lookAt(stone.position);
-                }
-            }
-        }
-        
-        // Meşaleleri güncelle
-        if (this.sceneManager.objects.torches) {
-            this.sceneManager.objects.torches.forEach(torch => {
-                torch.update(this.deltaTime);
-            });
-        }
-        
-        // Kontrolleri güncelle
-        if (this.controls.enabled) {
-            this.controls.update();
+        if (this.sceneManager) {
+            this.sceneManager.update(this.deltaTime);
         }
         
         // Sahneyi render et
@@ -513,110 +841,6 @@ class App {
     updateScore(value) {
         this.sceneManager.score += value;
         this.scoreElement.textContent = this.sceneManager.score;
-    }
-    
-    // Kamera modunu değiştirme metodu
-    setCameraMode(mode) {
-        if (this.cameraMode === mode) return;
-        
-        this.cameraMode = mode;
-        
-        // Mode değişiminde kamera konumunu sıfırlama
-        switch (mode) {
-            case 'free':
-                // Serbest mod - mevcut konumu koru
-                this.controls.enabled = true;
-                break;
-                
-            case 'follow':
-                // Takip modu - mancınığı takip eden kamera
-                this.controls.enabled = false;
-                if (this.sceneManager.objects.catapult) {
-                    const catapult = this.sceneManager.objects.catapult;
-                    // Mancınığın arkasında ve biraz yukarıda konum
-                    this.camera.position.set(
-                        catapult.position.x - 5 * Math.sin(catapult.angle),
-                        catapult.position.y + 3,
-                        catapult.position.z - 5 * Math.cos(catapult.angle)
-                    );
-                    // Mancınığa bak
-                    this.camera.lookAt(catapult.position);
-                }
-                break;
-                
-            case 'overhead':
-                // Kuşbakışı mod - yukarıdan bakış
-                this.controls.enabled = false;
-                this.camera.position.set(0, 20, 0);
-                this.camera.lookAt(0, 0, 0);
-                break;
-        }
-        
-        console.log(`Kamera modu değiştirildi: ${mode}`);
-    }
-    
-    // Kamera hareketi metodu
-    moveCamera(direction, speed) {
-        if (!this.camera) return;
-        
-        // Yön vektörlerini oluştur
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
-        const up = new THREE.Vector3(0, 1, 0);
-        
-        // İlgili yönde hareket et
-        switch (direction) {
-            case 'forward':
-                this.camera.position.addScaledVector(forward, speed);
-                break;
-            case 'backward':
-                this.camera.position.addScaledVector(forward, -speed);
-                break;
-            case 'left':
-                this.camera.position.addScaledVector(right, -speed);
-                break;
-            case 'right':
-                this.camera.position.addScaledVector(right, speed);
-                break;
-            case 'up':
-                this.camera.position.addScaledVector(up, speed);
-                break;
-            case 'down':
-                this.camera.position.addScaledVector(up, -speed);
-                break;
-        }
-    }
-    
-    // Kamera döndürme metodu
-    rotateCamera(direction, speed) {
-        if (!this.camera) return;
-        
-        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-        euler.setFromQuaternion(this.camera.quaternion);
-        
-        switch (direction) {
-            case 'left':
-                euler.y += speed;
-                break;
-            case 'right':
-                euler.y -= speed;
-                break;
-            case 'up':
-                euler.x = Math.max(-Math.PI / 2, euler.x + speed);
-                break;
-            case 'down':
-                euler.x = Math.min(Math.PI / 2, euler.x - speed);
-                break;
-        }
-        
-        this.camera.quaternion.setFromEuler(euler);
-    }
-    
-    // Kamera kilidini aç/kapat
-    toggleCameraLock() {
-        this.isCameraLocked = !this.isCameraLocked;
-        this.controls.enabled = !this.isCameraLocked;
-        console.log(`Kamera kilidi: ${this.isCameraLocked ? 'Açık' : 'Kapalı'}`);
     }
 }
 

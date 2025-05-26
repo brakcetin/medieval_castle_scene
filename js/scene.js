@@ -47,9 +47,9 @@ export class SceneManager {
         // Sahneyi düzgün şekilde temizle
         this.cleanupScene();
         
-        // Set initial camera position
-        this.camera.position.set(0, 5, 15);
-        this.camera.lookAt(0, 0, 0);
+        // Kamera pozisyonunu ayarla (artık main.js'de yapılıyor)
+        // this.camera.position.set(0, 5, 15);
+        // this.camera.lookAt(0, 0, 0);
         
         // Setup renderer
         this.renderer.setClearColor(0x87CEEB); // Açık mavi gökyüzü rengi
@@ -385,54 +385,45 @@ export class SceneManager {
                 this.objects.torches.push(torch);
             });
         }
-    }
-    
-    async createStones() {
-        // Create some stones for the catapult
-        try {
-            const { assetLoader } = await import('./AssetLoader.js');
-            
-            // Önceki taşları temizle
-            if (this.objects.stones && this.objects.stones.length > 0) {
-                this.objects.stones.forEach(stone => {
-                    if (stone && stone.mesh) {
-                        this.scene.remove(stone.mesh);
-                    }                });                this.objects.stones = [];            }            // 5 adet taş oluştur - mancınık yakınında yerleştir
-            for (let i = 0; i < 5; i++) {
-                const position = new THREE.Vector3(2 + i, 0.0, 9); // Y pozisyonunu 0.15 yaparak zemine daha yakın tutuyoruz
-                const stone = new Stone(this, position);
-                stone.isStatic = true; // Statik olarak işaretle, yerçekimi etkilemesin
-                
-                // AssetLoader kullanarak ekleyelim
-                if (assetLoader.assets['stone']) {
-                    const stoneModel = assetLoader.getModelCopy('stone');
-                    stoneModel.position.copy(position);
-                    stoneModel.scale.set(assetLoader.STONE_SCALE, assetLoader.STONE_SCALE, assetLoader.STONE_SCALE);
-                    
-                    // Modeli Stone nesnesine bağla
-                    stone.mesh = stoneModel;
-                    stone.loaded = true;
-                    
-                    // Sahneye ekle
-                    this.scene.add(stoneModel);
-                } else {
-                    // Manuel yükle
-                    stone.load();
+    }    async createStones() {
+        console.log("createStones metodu çağrıldı");
+        
+        // Önceki taşları temizle
+        if (this.objects.stones && this.objects.stones.length > 0) {
+            console.log(`${this.objects.stones.length} önceki taş temizleniyor`);
+            this.objects.stones.forEach(stone => {
+                if (stone && stone.mesh) {
+                    this.scene.remove(stone.mesh);
                 }
-                
-                this.objects.stones.push(stone);            }        } catch (error) {
-            console.error("Taşlar yüklenirken hata:", error);
-            // Klasik yöntemle taşları yükle
-            for (let i = 0; i < 5; i++) {
-                const stone = new Stone(
-                    this,
-                    new THREE.Vector3(2 + i, 0.0, 9) // Daha alçak pozisyon (y: 0.15) - zemine daha yakın duracak
-                );
-                stone.isStatic = true; // Statik olarak işaretle, yerçekimi etkilemesin
-                stone.load();
-                this.objects.stones.push(stone);
-            }
+            });
+            this.objects.stones = [];
+        }        // Mancınığın yanında tıklanabilir kayalar oluştur (sağ tarafta)
+        const catapultPos = this.objects.catapult ? this.objects.catapult.position : new THREE.Vector3(0, 0, 10);
+        console.log("Mancınık pozisyonu:", catapultPos);
+          // Test için taşları kameraya çok yakın yerleştir (görünürlük garantisi için)
+        const stonePositions = [
+            new THREE.Vector3(1, 0.5, 5),   // Kameranın çok yakınında
+            new THREE.Vector3(2, 0.5, 4),   
+            new THREE.Vector3(0, 0.5, 4),   
+            new THREE.Vector3(-1, 0.5, 5),   
+            new THREE.Vector3(1.5, 0.5, 3),   
+            new THREE.Vector3(-1.5, 0.5, 3),  
+            new THREE.Vector3(0, 0.5, 2)   // En yakın taş
+        ];
+
+        for (let i = 0; i < stonePositions.length; i++) {
+            const position = stonePositions[i];
+            console.log(`Taş ${i + 1} oluşturuluyor, pozisyon:`, position);
+            
+            const stone = new Stone(this, position);
+            stone.isStatic = true;
+            stone.isCollected = false; // Toplama durumu için
+            stone.load(); // Stone'u yükle
+            this.objects.stones.push(stone);
         }
+          console.log(`${stonePositions.length} adet tıklanabilir kaya oluşturuldu`);
+        console.log("Toplam stones array uzunluğu:", this.objects.stones.length);
+        console.log("Sahnedeki toplam çocuk sayısı:", this.scene.children.length);
     }
     
     interactWithObject(raycaster) {
@@ -549,9 +540,14 @@ export class SceneManager {
             console.error("Mancınık yüklenirken hata:", error);
             catapult.load(new GLTFLoader());
         }
-        
-        // Referansı güncelle
+          // Referansı güncelle
         this.objects.catapult = catapult;
+        
+        // Mancınık oluşturulduktan sonra kayaları oluştur
+        setTimeout(() => {
+            this.createStones();
+        }, 500); // Mancınığın yüklenmesi için kısa bir bekleme
+        
         return catapult;
     }
 }
