@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stone Collection Test - Medieval Castle</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        #test-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #00ff00;
+            max-width: 300px;
+            z-index: 1000;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        
+        #test-panel h3 {
+            color: #00ff00;
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        
+        .test-btn {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .test-btn:hover {
+            background: #66ff66;
+        }
+        
+        #status-container {
+            margin-top: 10px;
+            font-size: 12px;
+            padding: 5px;
+            border: 1px solid #444;
+            background: #222;
+            height: 200px;
+            overflow-y: auto;
+        }
+        
+        .status-success {
+            color: #00ff00;
+        }
+        
+        .status-warning {
+            color: #ffff00;
+        }
+        
+        .status-error {
+            color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div id="score-panel">Puan: <span id="score">0</span></div>
+    <div id="controls-panel">
+        <button id="day-night-toggle">Gece/Gündüz</button>
+    </div>
+    <div id="time-control-panel">
+        <h4>Zaman Kontrolü</h4>
+        <label for="time-slider">Saat: <span id="time-display">12</span></label>
+        <input type="range" id="time-slider" min="0" max="24" step="0.5" value="12">
+        <p>Gece: 20-6, Gündüz: 6-20</p>
+    </div>
+    
+    <div id="instructions">
+        <h3>Test Kontrolleri:</h3>
+        <p><strong>W, A, S, D</strong> - Hareket</p>
+        <p><strong>Sol Tık + Sürükle</strong> - Kamera</p>
+        <p><strong>Kayalara Tık</strong> - Taş Topla</p>
+        <p><strong>Mancınığa Tık</strong> - Yükle/Fırlat</p>
+        <p><strong>F</strong> - El Meşalesi Aç/Kapat</p>
+    </div>
+    
+    <div id="test-panel">
+        <h3>Taş Toplama & Mancınık Testi</h3>
+        <button id="verify-stones" class="test-btn">Taşları Doğrula</button>
+        <button id="simulate-collection" class="test-btn">Taş Toplama Simüle Et</button>
+        <button id="simulate-catapult" class="test-btn">Mancınık Yükleme Simüle Et</button>
+        <button id="check-inventory" class="test-btn">Envanter Kontrol</button>
+        <div id="status-container"></div>
+    </div>
+    
+    <div id="loading">Yükleniyor...</div>
+    <canvas id="scene-canvas"></canvas>
+
+    <!-- Three.js ve İlgili Kütüphaneler -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "dat.gui": "https://unpkg.com/dat.gui@0.7.9/build/dat.gui.module.js"
+            }
+        }
+    </script>
+    
+    <!-- dat.GUI Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
+      
+    <!-- Uygulama Kodları -->
+    <script type="module" src="js/main.js"></script>
+    
+    <!-- Test Scripti -->
+    <script type="module">
+        // Ana uygulama yüklendikten sonra test fonksiyonlarını ekle
+        window.addEventListener('load', function() {
+            console.log("Test sayfası yüklendi, testler hazırlanıyor...");
+            setTimeout(initializeTests, 3000); // Uygulama yüklenmesi için 3 saniye bekle
+        });
+        
+        function initializeTests() {
+            if (!window.app || !window.app.sceneManager) {
+                console.error("App veya SceneManager bulunamadı, 2 saniye daha bekleniyor...");
+                setTimeout(initializeTests, 2000);
+                return;
+            }
+            
+            console.log("Testler başlatılıyor...");
+            setupTestButtons();
+            logStatus("Test sistemi hazır.", "success");
+        }
+        
+        function setupTestButtons() {
+            document.getElementById('verify-stones').addEventListener('click', verifyStones);
+            document.getElementById('simulate-collection').addEventListener('click', simulateStoneCollection);
+            document.getElementById('simulate-catapult').addEventListener('click', simulateCatapultLoading);
+            document.getElementById('check-inventory').addEventListener('click', checkInventory);
+        }
+        
+        function logStatus(message, type = "normal") {
+            const statusContainer = document.getElementById('status-container');
+            const statusMsg = document.createElement('div');
+            statusMsg.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            
+            if (type === "success") {
+                statusMsg.className = "status-success";
+            } else if (type === "warning") {
+                statusMsg.className = "status-warning";
+            } else if (type === "error") {
+                statusMsg.className = "status-error";
+            }
+            
+            statusContainer.appendChild(statusMsg);
+            statusContainer.scrollTop = statusContainer.scrollHeight;
+        }
+        
+        function verifyStones() {
+            const stones = window.app.sceneManager.objects.stones;
+            logStatus(`${stones.length} taş bulundu.`);
+            
+            let visibleCount = 0;
+            let collectableCount = 0;
+            
+            stones.forEach((stone, index) => {
+                if (stone && stone.mesh && stone.mesh.visible) {
+                    visibleCount++;
+                }
+                
+                if (stone && !stone.isCollected) {
+                    collectableCount++;
+                }
+            });
+            
+            logStatus(`Görünür taş sayısı: ${visibleCount}/${stones.length}`, 
+                      visibleCount > 0 ? "success" : "error");
+            logStatus(`Toplanabilir taş sayısı: ${collectableCount}/${stones.length}`, 
+                      collectableCount > 0 ? "success" : "warning");
+        }
+        
+        function simulateStoneCollection() {
+            const stones = window.app.sceneManager.objects.stones;
+            if (!stones || stones.length === 0) {
+                logStatus("Toplanabilir taş bulunamadı.", "error");
+                return;
+            }
+            
+            // Find the first uncollected stone
+            const stone = stones.find(s => s && !s.isCollected);
+            if (!stone) {
+                logStatus("Tüm taşlar zaten toplanmış.", "warning");
+                return;
+            }
+            
+            // Simulate collection
+            logStatus(`Taş toplama simüle ediliyor...`);
+            stone.collect();
+            
+            // Update player inventory
+            window.app.playerInventory = window.app.playerInventory || {};
+            window.app.playerInventory.hasRock = true;
+            window.app.playerInventory.collectedStone = stone;
+            
+            logStatus(`Taş başarıyla toplandı!`, "success");
+            setTimeout(() => {
+                logStatus(`Taşın görünürlüğü: ${stone.mesh ? stone.mesh.visible : 'mesh yok'}`, 
+                         !stone.mesh || !stone.mesh.visible ? "success" : "error");
+            }, 500);
+        }
+        
+        function simulateCatapultLoading() {
+            const catapult = window.app.sceneManager.objects.catapult;
+            if (!catapult) {
+                logStatus("Mancınık bulunamadı.", "error");
+                return;
+            }
+            
+            if (catapult.hasStone) {
+                logStatus("Mancınık zaten dolu, fırlatılıyor...");
+                window.app.sceneManager.launchStone();
+                logStatus("Taş fırlatıldı!", "success");
+                return;
+            }
+            
+            if (!window.app.playerInventory || !window.app.playerInventory.hasRock) {
+                // Try to collect a stone first
+                simulateStoneCollection();
+                logStatus("Önce bir taş toplandı, şimdi mancınığa yükleniyor...");
+            }
+            
+            if (window.app.playerInventory && window.app.playerInventory.hasRock && window.app.playerInventory.collectedStone) {
+                const loaded = catapult.loadStone(window.app.playerInventory.collectedStone);
+                if (loaded) {
+                    window.app.playerInventory.hasRock = false;
+                    window.app.playerInventory.collectedStone = null;
+                    logStatus("Taş mancınığa başarıyla yüklendi!", "success");
+                    logStatus(`Mancınık doluluk durumu: ${catapult.hasStone ? 'Dolu' : 'Boş'}`);
+                } else {
+                    logStatus("Taş mancınığa yüklenemedi.", "error");
+                }
+            } else {
+                logStatus("Envanterinizde yüklenecek taş yok.", "warning");
+            }
+        }
+        
+        function checkInventory() {
+            const inventory = window.app.playerInventory || {};
+            logStatus(`Envanter durumu:`);
+            logStatus(`Taş var mı: ${inventory.hasRock ? 'Evet' : 'Hayır'}`);
+            
+            const catapult = window.app.sceneManager.objects.catapult;
+            logStatus(`Mancınık durumu: ${catapult ? (catapult.hasStone ? 'Dolu' : 'Boş') : 'Bulunamadı'}`);
+            
+            const stones = window.app.sceneManager.objects.stones || [];
+            const collectableCount = stones.filter(s => s && !s.isCollected).length;
+            logStatus(`Kalan toplanabilir taş: ${collectableCount}`);
+        }
+    </script>
+</body>
+</html>

@@ -50,12 +50,11 @@ export class SceneManager {
         // Kamera pozisyonunu ayarla (artık main.js'de yapılıyor)
         // this.camera.position.set(0, 5, 15);
         // this.camera.lookAt(0, 0, 0);
-        
-        // Setup renderer
+          // Setup renderer (performans odaklı ayarlar main.js'de yapıldı)
         this.renderer.setClearColor(0x87CEEB); // Açık mavi gökyüzü rengi
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        
+        // Fog ekle (uzak nesneleri gizleyerek performans artırır)
+        this.scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
         
         // Aydınlatma sistemi ekle
         this.setupLighting();
@@ -128,26 +127,25 @@ export class SceneManager {
         
         console.log("Sahne temizlendi - kalan nesne sayısı:", this.scene.children.length);
     }
-    
-    setupLighting() {
+      setupLighting() {
         // Ambient light - genel ortam ışığı
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         this.scene.add(this.ambientLight);
         
-        // Directional light - güneş ışığı etkisi
+        // Directional light - güneş ışığı etkisi (performans odaklı)
         this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         this.directionalLight.position.set(50, 200, 100);
         this.directionalLight.castShadow = true;
         
-        // Gölgeleri daha iyi gösterebilmek için ayarlar
-        this.directionalLight.shadow.mapSize.width = 1024;
-        this.directionalLight.shadow.mapSize.height = 1024;
+        // Gölge ayarları - performans için düşük çözünürlük
+        this.directionalLight.shadow.mapSize.width = 512; // 1024'den 512'ye düşürüldü
+        this.directionalLight.shadow.mapSize.height = 512; // 1024'den 512'ye düşürüldü
         this.directionalLight.shadow.camera.near = 10;
-        this.directionalLight.shadow.camera.far = 400;
-        this.directionalLight.shadow.camera.left = -50;
-        this.directionalLight.shadow.camera.right = 50;
-        this.directionalLight.shadow.camera.top = 50;
-        this.directionalLight.shadow.camera.bottom = -50;
+        this.directionalLight.shadow.camera.far = 200; // 400'den 200'e düşürüldü
+        this.directionalLight.shadow.camera.left = -30; // -50'den -30'a
+        this.directionalLight.shadow.camera.right = 30; // 50'den 30'a
+        this.directionalLight.shadow.camera.top = 30; // 50'den 30'a
+        this.directionalLight.shadow.camera.bottom = -30; // -50'den -30'a
         
         this.scene.add(this.directionalLight);
     }
@@ -399,16 +397,15 @@ export class SceneManager {
             this.objects.stones = [];
         }        // Mancınığın yanında tıklanabilir kayalar oluştur (sağ tarafta)
         const catapultPos = this.objects.catapult ? this.objects.catapult.position : new THREE.Vector3(0, 0, 10);
-        console.log("Mancınık pozisyonu:", catapultPos);
-          // Test için taşları kameraya çok yakın yerleştir (görünürlük garantisi için)
+        console.log("Mancınık pozisyonu:", catapultPos);        // Taşları mancınığın etrafına yere/zemine yerleştir
         const stonePositions = [
-            new THREE.Vector3(1, 0.5, 5),   // Kameranın çok yakınında
-            new THREE.Vector3(2, 0.5, 4),   
-            new THREE.Vector3(0, 0.5, 4),   
-            new THREE.Vector3(-1, 0.5, 5),   
-            new THREE.Vector3(1.5, 0.5, 3),   
-            new THREE.Vector3(-1.5, 0.5, 3),  
-            new THREE.Vector3(0, 0.5, 2)   // En yakın taş
+            new THREE.Vector3(11, 0.2, 9),   // Mancınığın sağ tarafında
+            new THREE.Vector3(10.5, 0.2, 10.5), // Mancınığın sağ arka tarafında
+            new THREE.Vector3(9, 0.2, 11),   // Mancınığın arkasında
+            new THREE.Vector3(-1, 0.2, 11),  // Mancınığın sol tarafında
+            new THREE.Vector3(-0.5, 0.2, 10), // Mancınığın sol ön tarafında
+            new THREE.Vector3(2, 0.2, 9.5),  // Mancınığın önünde sağda
+            new THREE.Vector3(-2, 0.2, 9.5)  // Mancınığın önünde solda
         ];
 
         for (let i = 0; i < stonePositions.length; i++) {
@@ -458,8 +455,24 @@ export class SceneManager {
         if (stone) {
             // Mancınık ters döndü ama aynı pozisyonda, o yüzden negatif Z yönünde fırlat
             const direction = new THREE.Vector3(0, 1, -1).normalize(); // z ekseni boyunca negatif yönde fırlat (kaleye doğru)
-            stone.launch(direction, 15);
+            
+            // Biraz rasgele faktör ekle (daha doğal atış için)
+            direction.x += (Math.random() * 0.2) - 0.1;
+            direction.z += (Math.random() * 0.1) - 0.05;
+            direction.normalize();
+            
+            // Daha yüksek güç (15'ten 20'ye)
+            stone.launch(direction, 20);
+            
+            // Taşın görünürlüğünü kontrol et
+            if (stone.mesh) {
+                stone.mesh.visible = true;
+            }
+            
             this.updateScore(10);
+            console.log("Taş fırlatıldı! Yön:", direction, "Başlangıç pozisyonu:", stone.position);
+        } else {
+            console.log("Fırlatılacak taş yok!");
         }
     }
     
@@ -467,22 +480,64 @@ export class SceneManager {
         this.score += points;
         document.getElementById('score').textContent = this.score;
     }
-    
-    update(deltaTime) {
-        // Update catapult
-        if (this.objects.catapult) {
+      update(deltaTime) {
+        // Performance: Update interval yönetimi
+        this.updateCounter = (this.updateCounter || 0) + 1;
+        
+        // Update catapult (daha az sıklıkla)
+        if (this.objects.catapult && this.updateCounter % 2 === 0) {
             this.objects.catapult.update();
         }
         
-        // Update stones
-        this.objects.stones.forEach(stone => {
-            stone.update(deltaTime);
+        // Update stones (chunk'lar halinde)
+        const stoneChunkSize = 5; // Her frame'de maksimum 5 taş güncelle
+        const startIndex = (this.updateCounter * stoneChunkSize) % this.objects.stones.length;
+        const endIndex = Math.min(startIndex + stoneChunkSize, this.objects.stones.length);
+        
+        for (let i = startIndex; i < endIndex; i++) {
+            if (this.objects.stones[i]) {
+                this.objects.stones[i].update(deltaTime);
+            }
+        }
+        
+        // Update torches (daha az sıklıkla)
+        if (this.updateCounter % 3 === 0) {
+            const torchChunkSize = 3; // Her 3. frame'de maksimum 3 meşale güncelle
+            const torchStartIndex = ((this.updateCounter / 3) * torchChunkSize) % this.objects.torches.length;
+            const torchEndIndex = Math.min(torchStartIndex + torchChunkSize, this.objects.torches.length);
+            
+            for (let i = torchStartIndex; i < torchEndIndex; i++) {
+                if (this.objects.torches[i]) {
+                    this.objects.torches[i].update(deltaTime);
+                }
+            }
+        }
+        
+        // Performance: Garbage collection önerisi (uzun süre çalışan oyunlar için)
+        if (this.updateCounter % 1800 === 0) { // Her 60 saniyede bir (30fps * 60s = 1800 frame)
+            this.performPerformanceOptimization();
+        }
+    }
+    
+    // Performans optimizasyonu metodu
+    performPerformanceOptimization() {
+        console.log("Scene performance optimization başlatıldı...");
+        
+        // Ölü taşları temizle
+        this.objects.stones = this.objects.stones.filter(stone => {
+            if (!stone.active || stone.isCollected) {
+                stone.dispose();
+                return false;
+            }
+            return true;
         });
         
-        // Update torches
-        this.objects.torches.forEach(torch => {
-            torch.update(deltaTime);
-        });
+        // Renderer cache temizliği
+        if (this.renderer.info.memory.geometries > 50) {
+            console.log("Renderer cache temizleniyor...");
+        }
+        
+        console.log(`Scene optimization tamamlandı. Aktif taş sayısı: ${this.objects.stones.length}`);
     }
     
     // Mancınık oluşturan ve yükleyen metod
@@ -506,8 +561,7 @@ export class SceneManager {
                 const catapultModel = assetLoader.getModelCopy('catapult');
                 catapultModel.position.copy(position);
                 catapultModel.rotation.y = catapult.angle;
-                
-                // Modeli Catapult nesnesine bağla
+                      // Modeli Catapult nesnesine bağla
                 catapult.model = catapultModel;
                 catapult.loaded = true;
                 
@@ -516,6 +570,13 @@ export class SceneManager {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
+                        
+                        // Mancınık için tıklanabilir userData ekle
+                        child.userData = {
+                            type: 'catapult_part',
+                            catapultRef: catapult,
+                            isClickable: true
+                        };
                     }
                     
                     // Mancınık parçalarını isimlerine göre tanımla

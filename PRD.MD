@@ -90,43 +90,44 @@
 - [x] Mancınık ve taşlar için animasyonları oluştur. (tamamlandı)
 
 ### 4. Temel Özellikler
-- [ ] Kamera hareketlerini uygulamaya ekle.
-- [ ] Mancınık mekaniğini geliştir ve taş fırlatma özelliğini ekle.
-- [ ] Meşale aydınlatma sistemini oluştur.
-- [ ] Gece/gündüz geçişini dinamik olarak uygula.
-- [ ] Puanlama sistemini entegre et.
+- [x] Kamera hareketlerini uygulamaya ekle. (tamamlandı)
+- [x] Mancınık mekaniğini geliştir ve taş fırlatma özelliğini ekle. (tamamlandı)
+- [x] Meşale aydınlatma sistemini oluştur. (tamamlandı)
+- [x] Gece/gündüz geçişini dinamik olarak uygula. (tamamlandı)
+- [x] Puanlama sistemini entegre et. (tamamlandı)
 
 ### 5. Kullanıcı Arayüzü
-- [ ] Işık parlaklığı ayarlarını kontrol edebilecek bir UI öğesi ekle.
-- [ ] Gece/gündüz geçiş butonlarını tasarla ve uygula.
-- [ ] Puan panelini oluştur ve entegre et.
+- [x] Işık parlaklığı ayarlarını kontrol edebilecek bir UI öğesi ekle. (tamamlandı)
+- [x] Gece/gündüz geçiş butonlarını tasarla ve uygula. (tamamlandı)
+- [x] Puan panelini oluştur ve entegre et. (tamamlandı)
 
 ### 6. Kullanıcı Etkileşimleri
-- [ ] Klavye ve fare ile sahne ve nesnelerle etkileşim mekanizmasını geliştir.
-- [ ] Fare ile kamera hareketlerini kontrol edilebilir hale getir.
-- [ ] Klavye ile mancınık kontrolünü sağla.
+- [x] Klavye ve fare ile sahne ve nesnelerle etkileşim mekanizmasını geliştir. (tamamlandı)
+- [x] Fare ile kamera hareketlerini kontrol edilebilir hale getir. (tamamlandı)
+- [x] Klavye ile mancınık kontrolünü sağla. (tamamlandı)
 
 ### 7. Oyun Mantığı
-- [ ] Puanlama sistemini geliştir ve hedeflere isabet durumunda puan ekle.
-- [ ] Etkileşim kurallarını belirle ve uygula.
+- [x] Puanlama sistemini geliştir ve hedeflere isabet durumunda puan ekle. (tamamlandı)
+- [x] Etkileşim kurallarını belirle ve uygula. (tamamlandı)
 
 ### 8. Işıklandırma ve Efektler
-- [ ] Gündüz/gece ışık sistemini dinamik olarak uygula.
-- [ ] Meşale parlaklık ayarlarını kontrol edilebilir hale getir.
+- [x] Gündüz/gece ışık sistemini dinamik olarak uygula. (tamamlandı)
+- [x] Meşale parlaklık ayarlarını kontrol edilebilir hale getir. (tamamlandı)
 
 ### 9. Varsayımlar ve Sınırlamalar
 - [ ] Modern tarayıcı desteğini kontrol et.
 - [ ] Düşük performanslı cihazlar için optimizasyon yap.
 
 ### 10. Kaynaklar
-- [ ] Three.js dokümantasyonunu incele ve kullan.
-- [ ] GLTFLoader kılavuzunu takip et.
-- [ ] dat.GUI rehberini kullanarak ayarları yapılandır.
+- [x] Three.js dokümantasyonunu incele ve kullan. (tamamlandı)
+- [x] GLTFLoader kılavuzunu takip et. (tamamlandı)
+- [x] dat.GUI rehberini kullanarak ayarları yapılandır. (tamamlandı)
 
 ### 11. Proje Özeti
-- [ ] Proje tanımını ve amacını uygulamaya yansıt.
+- [x] Proje tanımını ve amacını uygulamaya yansıt. (tamamlandı)
 
 ### 12. Hedefler ve Amaçlar
-- [ ] Kullanıcıların ortaçağ atmosferini deneyimleyebileceği bir sahne oluştur.
-- [ ] Kullanıcıların sahne içinde serbestçe hareket edebilmesini sağla.
+- [x] Kullanıcıların ortaçağ atmosferini deneyimleyebileceği bir sahne oluştur. (tamamlandı)
+- [x] Kullanıcıların sahne içinde serbestçe hareket edebilmesini sağla. (tamamlandı)
+- [x] Mancınık mekaniğini ve gece/gündüz geçişlerini kontrol edilebilir hale getir. (tamamlandı)
 - [ ] Mancınık mekaniğini ve gece/gündüz geçişlerini kontrol edilebilir hale getir.

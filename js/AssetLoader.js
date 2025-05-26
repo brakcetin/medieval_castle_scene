@@ -41,14 +41,34 @@ class AssetLoader {
                     
                     // Ölçeği ayarla
                     model.scale.set(scale, scale, scale);
-                    
-                    // Alt mesh'leri etiketle ve gölgeleri ayarla
+                      // Alt mesh'leri etiketle ve gölgeleri ayarla
                     model.traverse((child) => {
                         if (child.isMesh) {
-                            child.castShadow = true;
+                            // Performans için gölgeleri sadece gerekli nesnelerde etkinleştir
+                            child.castShadow = name !== 'stone'; // Taşlar gölge yapmaz
                             child.receiveShadow = true;
                             child.userData.type = `${name}_part`;
                             child.userData.parentModel = name;
+                            
+                            // Geometri optimizasyonu
+                            if (child.geometry) {
+                                child.geometry.computeBoundingSphere();
+                                child.geometry.computeBoundingBox();
+                            }
+                            
+                            // Material optimizasyonu
+                            if (child.material) {
+                                // Texture kalitesini düşür
+                                if (child.material.map) {
+                                    child.material.map.generateMipmaps = false;
+                                    child.material.map.minFilter = THREE.LinearFilter;
+                                }
+                                // Normalmap ve diğer detay map'leri kaldır (RAM tasarrufu)
+                                child.material.normalMap = null;
+                                child.material.roughnessMap = null;
+                                child.material.metalnessMap = null;
+                                child.material.needsUpdate = true;
+                            }
                         }
                     });
                     

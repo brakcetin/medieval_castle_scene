@@ -146,24 +146,34 @@ export class Catapult {
         this.charging = true;
         this.power = 20;
     }
-    
-    loadStone(stone) {
+      loadStone(stone) {
         if (!this.hasStone && stone && !stone.isLaunched) {
             this.hasStone = true;
             this.loadedStone = stone;
             
             // Taşı mancınığın kovasına yerleştir
             if (this.bucket && stone.mesh) {
-                stone.mesh.position.copy(this.bucket.position);
-                stone.mesh.position.y += 0.2; // Kovadan biraz yukarıda
+                // Taşın pozisyonunu güncelle (dünya koordinatlarında)
+                const bucketWorldPosition = new THREE.Vector3();
+                this.bucket.getWorldPosition(bucketWorldPosition);
+                
+                // Taşın pozisyonunu kovaya ayarla
+                stone.mesh.position.copy(bucketWorldPosition);
+                stone.position.copy(bucketWorldPosition);
+                stone.mesh.position.y += 0.3; // Kovadan biraz yukarıda
+                stone.position.y += 0.3;
+                
+                // Taşın görünür olduğundan emin ol
+                stone.mesh.visible = true;
+                
+                console.log("Taş mancınığa yüklendi, pozisyon:", stone.mesh.position);
             }
             
             return true;
         }
         return false;
     }
-    
-    launch() {
+      launch() {
         if (this.hasStone && this.loadedStone) {
             const stone = this.loadedStone;
             this.hasStone = false;
@@ -171,10 +181,17 @@ export class Catapult {
             
             // Taşı fırlat
             stone.isLaunched = true;
+            stone.isStatic = false; // Statik durumdan çıkar, fizik etkisi başlasın
             
             // Mancınık animasyonunu başlat
             this.animating = true;
             this.animationTime = 0;
+            
+            // Yüklü bir taş kullanıldı, isCollected değerini sıfırlayalım
+            // böylece atış sonrası tekrar toplanabilmez
+            stone.isCollected = false;
+            
+            console.log("Mancınıktan taş fırlatıldı");
             
             return stone;
         }
@@ -187,14 +204,13 @@ export class Stone {
         this.scene = scene;
         this.mesh = null;
         
-        if (position) {
-            this.position = position.clone();
+        if (position) {        this.position = position.clone();
         } else {
             this.position = null;
         }
         
         this.velocity = new THREE.Vector3();
-        this.radius = 0.5; // Yarıçapı artırdık (0.25 -> 0.5)
+        this.radius = 0.3; // Yarıçapı küçülttük
         this.lifetime = 10;
         this.active = true;
         this.isStatic = true;
@@ -209,25 +225,36 @@ export class Stone {
             return;
         }
         
-        const gltfLoader = new GLTFLoader();
-        gltfLoader.load('./models/stone.glb', (gltf) => {
-            console.log("Stone modeli başarıyla yüklendi");
-            this.mesh = gltf.scene;
+        const gltfLoader = new GLTFLoader();        gltfLoader.load('./models/stone.glb', (gltf) => {
+            console.log("Stone modeli başarıyla yüklendi");            this.mesh = gltf.scene;
             this.mesh.position.copy(this.position);
-            this.mesh.scale.set(0.4, 0.4, 0.4); // Boyutu artırdık
+            this.mesh.scale.set(0.25, 0.25, 0.25); // Boyutu küçülttük
+            
+            // Stone için identifier ekle
+            this.mesh.name = `stone_${Math.random().toString(36).substr(2, 9)}`;
+            this.mesh.userData = {
+                type: 'stone',
+                stoneRef: this,
+                isClickable: true
+            };
             
             this.mesh.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+                    // Child meshler için de userData ekle
+                    child.userData = {
+                        type: 'stone',
+                        stoneRef: this,
+                        isClickable: true
+                    };
                 }
             });
             
             this.scene.scene.add(this.mesh); // SceneManager'dan scene'e erişim
             console.log("Taş sahneye eklendi");
-        }, undefined, (error) => {            console.error("Taş modeli yüklenirken hata:", error);
-            console.log("Fallback küre geometrisi oluşturuluyor");
-              const geometry = new THREE.SphereGeometry(1.2, 32, 32); // Çok büyük boyut (0.8'den 1.2'ye)
+        }, undefined, (error) => {            console.error("Taş modeli yüklenirken hata:", error);            console.log("Fallback küre geometrisi oluşturuluyor");
+              const geometry = new THREE.SphereGeometry(0.3, 16, 16); // Boyutu küçülttük (1.2'den 0.3'e)
             const material = new THREE.MeshStandardMaterial({ 
                 color: 0xFF4444,  // Parlak kırmızı renk
                 roughness: 0.3,
@@ -237,16 +264,40 @@ export class Stone {
             });            this.mesh = new THREE.Mesh(geometry, material);
             this.mesh.position.copy(this.position);
             this.mesh.castShadow = true;
+            
+            // Fallback stone için de identifier ekle
+            this.mesh.name = `fallback_stone_${Math.random().toString(36).substr(2, 9)}`;
+            this.mesh.userData = {
+                type: 'stone',
+                stoneRef: this,
+                isClickable: true
+            };
+            
             this.scene.scene.add(this.mesh); // SceneManager'dan scene'e erişim
             console.log("Fallback taş sahneye eklendi, pozisyon:", this.position);
             console.log("Taş mesh ID:", this.mesh.uuid);
             console.log("Sahne çocuk sayısı (taş eklendikten sonra):", this.scene.scene.children.length);
         });
-    }
-    
-    update(deltaTime) {
+    }      update(deltaTime) {
         // Eğer mesh yoksa veya pozisyon atanmamışsa işlem yapma
         if (!this.mesh || !this.position) return;
+        
+        // Performance: Toplanan taşları güncelleme - tamamen atla
+        if (this.isCollected && !this.isLaunched) return;
+        
+        // Performance: Update interval azaltma (her frame değil)
+        this.updateCounter = (this.updateCounter || 0) + 1;
+        if (this.isStatic && this.updateCounter % 5 !== 0) {
+            return; // Statik taşları her 5. frame'de güncelle
+        }
+        
+        // Mancınığa yüklenen taş güncelleme (pozisyon sync)
+        if (this.isCollected && this.isLaunched) {
+            // Mancınıktan fırlatılmışsa mesh pozisyonunu güncelle
+            if (this.mesh) {
+                this.mesh.position.copy(this.position);
+            }
+        }
         
         // Statik taşlar için fiziği uygulamıyoruz
         if (!this.isStatic) {
@@ -255,12 +306,16 @@ export class Stone {
             
             // Update position
             this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
-            this.mesh.position.copy(this.position);
+            
+            if (this.mesh) {
+                this.mesh.position.copy(this.position);
+            }
             
             // Decrease lifetime
             this.lifetime -= deltaTime;
             if (this.lifetime <= 0) {
                 this.remove();
+                return;
             }
                   // Check for ground collision
             if (this.position.y <= this.radius * 0.5) { // Yarıçapın yarısı kadar mesafe yeterli
@@ -269,25 +324,30 @@ export class Stone {
                 this.velocity.x *= 0.8; // Sürtünmeyi artır (0.9 -> 0.8)
                 this.velocity.z *= 0.8; // Sürtünmeyi artır (0.9 -> 0.8)
                 
-                // If velocity is very low, stop movement
+                // If velocity is very low, stop movement                
                 if (this.velocity.length() < 1) {
                     this.velocity.set(0, 0, 0);
-                    // Taş durduğunda statik yapabiliriz
-                    // this.isStatic = true; // İsteğe bağlı
+                    this.isStatic = true; // Performans için statik yap
+                    
+                    // Taş durduğunda tam olarak yere otursun
+                    this.position.y = this.radius;
                 }
             }
         } else {
-            // Statik taşlar için sadece pozisyonu güncelleyelim
-            if (this.mesh) {
+            // Statik taşlar için sadece pozisyonu güncelleyelim (daha az sıklıkla)
+            if (this.mesh && this.updateCounter % 10 === 0) {
                 this.mesh.position.copy(this.position);
             }
         }
         
-        // Check collision with other objects
-        const collider = this.scene.checkCollisions(this);
-        if (collider) {
-            // Handle collision
-            this.handleCollision(collider);
+        // Performance: Collision detection'ı azalt
+        if (!this.isStatic && this.updateCounter % 3 === 0) {
+            // Check collision with other objects
+            const collider = this.scene.checkCollisions(this);
+            if (collider) {
+                // Handle collision
+                this.handleCollision(collider);
+            }
         }
     }
     
@@ -302,15 +362,36 @@ export class Stone {
         if (separation > 0) {
             this.position.add(direction.multiplyScalar(separation));
         }
-    }
-      remove() {
+    }      remove() {
         if (!this.active) return;
         
         this.active = false;
         if (this.mesh) {
-            this.scene.remove(this.mesh); // Fixed: using remove instead of removeObject
+            this.scene.scene.remove(this.mesh); // SceneManager'dan scene'e erişim
+            
+            // Memory cleanup
+            if (this.mesh.geometry) {
+                this.mesh.geometry.dispose();
+            }
+            if (this.mesh.material) {
+                if (Array.isArray(this.mesh.material)) {
+                    this.mesh.material.forEach(mat => mat.dispose());
+                } else {
+                    this.mesh.material.dispose();
+                }
+            }
+            
             this.mesh = null;
+            console.log("Taş başarıyla temizlendi");
         }
+    }
+    
+    // Performance cleanup metodu
+    dispose() {
+        this.remove();
+        this.position = null;
+        this.velocity = null;
+        this.scene = null;
     }
     
     // Taşın fırlatılmasını sağlayan metod
@@ -321,6 +402,83 @@ export class Stone {
         
         // Hızını ayarla
         this.velocity.copy(direction).multiplyScalar(power);
+    }    // Taşın toplanmasını sağlayan metod
+    collect() {
+        if (this.isCollected) {
+            console.log("Stone already collected");
+            return false;
+        }
+        
+        this.isCollected = true;
+        console.log("Stone collected successfully!");
+        
+        // Toplama animasyonu göster
+        if (this.mesh) {
+            this.showCollectEffect();
+            
+            // Taşı tamamen kaldır (sadece gizlemek yerine)
+            setTimeout(() => {
+                if (this.mesh) {
+                    // Önce görünmez yap
+                    this.mesh.visible = false;
+                    
+                    // Sonra tamamen kaldır (memory cleanup için)
+                    setTimeout(() => {
+                        this.remove();
+                    }, 100);
+                }
+            }, 300); // 300ms sonra taşı gizle (efektten sonra)
+        }
+        
+        return true;
+    }
+    
+    // Taş toplama efekti
+    showCollectEffect() {
+        if (!this.mesh || !this.scene || !this.scene.scene) return;
+        
+        // Parıldama efekti için basit bir küre
+        const glowGeom = new THREE.SphereGeometry(0.4, 16, 16);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: 0xFFFFFF,
+            transparent: true,
+            opacity: 0.7
+        });
+        
+        const glow = new THREE.Mesh(glowGeom, glowMat);
+        glow.position.copy(this.position);
+        glow.scale.set(1, 1, 1);
+        
+        this.scene.scene.add(glow);
+        
+        // Büyüyüp kaybolan animasyon
+        const startTime = Date.now();
+        const duration = 300; // ms cinsinden süre
+        
+        const animateGlow = () => {
+            const elapsedTime = Date.now() - startTime;
+            const progress = elapsedTime / duration;
+            
+            if (progress >= 1) {
+                // Animasyon bitti, efekti kaldır
+                this.scene.scene.remove(glow);
+                glowGeom.dispose();
+                glowMat.dispose();
+                return;
+            }
+            
+            // Büyüme ve şeffaflaşma
+            const scale = 1 + progress * 2; // 1x'den 3x'e büyü
+            const opacity = 0.7 * (1 - progress); // 0.7'den 0'a şeffaflaş
+            
+            glow.scale.set(scale, scale, scale);
+            glowMat.opacity = opacity;
+            
+            requestAnimationFrame(animateGlow);
+        };
+        
+        // Animasyonu başlat
+        animateGlow();
     }
 }
 
@@ -387,12 +545,17 @@ export class Torch {
             this.scene.add(this.model); // Fixed: using add instead of addObject
         });
     }
-      
-    update(deltaTime) {
+        update(deltaTime) {
         if (!this.model) return;
         
+        // Performance: Update interval azaltma
+        this.updateCounter = (this.updateCounter || 0) + 1;
+        if (this.updateCounter % 3 !== 0) {
+            return; // Her 3. frame'de güncelle
+        }
+        
         // Update time for flickering effect
-        this.time += deltaTime;
+        this.time += deltaTime * 3; // deltaTime'ı 3 ile çarp çünkü her 3. frame
         
         // Calculate flicker based on noise
         const flicker = Math.sin(this.time * this.flickerSpeed) * this.flickerIntensity;
@@ -402,8 +565,8 @@ export class Torch {
             this.light.intensity = this.intensity * (1 + flicker);
         }
         
-        // Apply flicker to flame size if flame exists
-        if (this.flame) {
+        // Apply flicker to flame size if flame exists (daha az sıklıkla)
+        if (this.flame && this.updateCounter % 6 === 0) {
             const scale = 1 + flicker * 0.5;
             this.flame.scale.set(scale, scale, scale);
         }
