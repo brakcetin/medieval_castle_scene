@@ -456,8 +456,8 @@ export class SceneManager {
         }
         
         return false;
-    }    launchStone() {
-        const stone = this.objects.catapult.launch();
+    }    launchStone(powerLevel = 0.8) {
+        const stone = this.objects.catapult.launch(powerLevel);
         if (stone) {
             // Mancınık ters döndü ama aynı pozisyonda, o yüzden negatif Z yönünde fırlat
             const direction = new THREE.Vector3(0, 1, -1).normalize(); // z ekseni boyunca negatif yönde fırlat (kaleye doğru)
@@ -467,19 +467,46 @@ export class SceneManager {
             direction.z += (Math.random() * 0.1) - 0.05;
             direction.normalize();
             
-            // Daha yüksek güç (15'ten 20'ye)
-            stone.launch(direction, 20);
+            // Güç seviyesine göre fırlatma gücünü ayarla
+            const basePower = 20;
+            const adjustedPower = basePower * powerLevel;
+            stone.launch(direction, adjustedPower);
             
             // Taşın görünürlüğünü kontrol et
             if (stone.mesh) {
                 stone.mesh.visible = true;
             }
             
-            this.updateScore(10);
-            console.log("Taş fırlatıldı! Yön:", direction, "Başlangıç pozisyonu:", stone.position);
+            // Power level'a göre puan vermek yerine, bu main.js'deki evaluateShot'ta yapılıyor
+            console.log("Taş fırlatıldı! Yön:", direction, "Güç:", adjustedPower, "Başlangıç pozisyonu:", stone.position);
         } else {
             console.log("Fırlatılacak taş yok!");
         }
+    }
+
+    // Power bar sistemi için stone physics başlatma metodu
+    startStonePhysics(stone, powerLevel) {
+        if (!stone) return;
+        
+        // Mancınık ters döndü ama aynı pozisyonda, o yüzden negatif Z yönünde fırlat
+        const direction = new THREE.Vector3(0, 1, -1).normalize();
+        
+        // Biraz rasgele faktör ekle (daha doğal atış için)
+        direction.x += (Math.random() * 0.2) - 0.1;
+        direction.z += (Math.random() * 0.1) - 0.05;
+        direction.normalize();
+        
+        // Güç seviyesine göre fırlatma gücünü ayarla
+        const basePower = 20;
+        const adjustedPower = basePower * powerLevel;
+        stone.launch(direction, adjustedPower);
+        
+        // Taşın görünürlüğünü kontrol et
+        if (stone.mesh) {
+            stone.mesh.visible = true;
+        }
+        
+        console.log("Stone physics başlatıldı! Güç:", adjustedPower);
     }
     
     updateScore(points) {

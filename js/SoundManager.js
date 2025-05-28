@@ -15,10 +15,12 @@ export class BasitSoundManager {
         
         console.log("🔊 Basit ses yöneticisi hazırlandı");
     }
-    
-    // Mancınık ateşleme sesi çalma
-    catapultAtesle() {
-        console.log("🔊 Mancınık ateşleme sesi çalınıyor");
+      // Mancınık ateşleme sesi çalma
+    catapultAtesle(volume = 1.0) {
+        console.log("🔊 Mancınık ateşleme sesi çalınıyor, volume:", volume);
+        
+        // Volume ayarla
+        this.mancınikAtesSesi.volume = Math.min(Math.max(volume, 0), 1);
         
         // Eğer ses çalıyorsa, başa sarıp tekrar çal
         this.mancınikAtesSesi.pause();

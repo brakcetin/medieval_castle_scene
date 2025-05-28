@@ -79,10 +79,20 @@ class App {
         this.playerInventory = { 
             hasRock: false,
             collectedStone: null 
-        };
-          // Bildirim sistemi
+        };        // Bildirim sistemi
         this.notificationTimeout = null;
         this.catapultState = 'empty'; // 'empty', 'loaded', 'ready'
+        
+        // Power Bar Sistemi
+        this.powerBarContainer = null;
+        this.powerMarker = null;
+        this.powerBarActive = false;
+        this.markerPosition = 0; // 0-100 arası
+        this.markerDirection = 1; // 1 = sağa, -1 = sola
+        this.markerSpeed = 1.5; // Hareket hızı
+        this.pendingCatapult = null; // Güç barı için bekleyen mancınık
+        this.pendingStone = null; // Güç barı için bekleyen taş
+        this.animationId = null; // Animation frame ID
         
         // Başlatma
         this.init();
@@ -171,8 +181,7 @@ class App {
                 this.scoreElement.textContent = "0";
             }
         };
-        
-        // Olay dinleyiciler
+          // Olay dinleyiciler
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
         window.addEventListener('keydown', this.onKeyDown.bind(this));
         window.addEventListener('keyup', this.onKeyUp.bind(this));
@@ -181,6 +190,9 @@ class App {
         window.addEventListener('mousemove', this.onMouseMove.bind(this));
         this.dayNightToggle.addEventListener('click', this.toggleDayNight.bind(this));
         window.addEventListener('click', this.onClick.bind(this));
+        
+        // Power Bar DOM elementlerini başlat
+        this.initializePowerBar();
         
         // GUI oluşturma
         this.setupGUI();
@@ -1107,10 +1119,12 @@ class App {
                 break;
             case 'KeyF':
                 this.toggleHandTorch();
-                break;
-            case 'Space':
+                break;            case 'Space':
                 event.preventDefault();
-                // Mancınık kontrolü için boşluk tuşu
+                // Power bar aktifse durdurmak için space tuşu
+                if (this.powerBarActive) {
+                    this.stopPowerBar();
+                }
                 break;
         }
     }
@@ -1364,13 +1378,12 @@ class App {
                             
                             this.showNotification("✅ Taş mancınığa yüklendi! Fırlatmak için tekrar tıklayın!", 3000, 'success');
                         }
-                    } 
-                    // Mancınık zaten yüklüyse fırlat
+                    }                    // Mancınık zaten yüklüyse power bar'ı başlat
                     else if (catapult && catapult.hasStone) {
-                        console.log("🚀 Mancınıktan taş fırlatılıyor...");
-                        this.sceneManager.launchStone();
-                        this.showNotification("🚀 Taş fırlatıldı!", 3000, 'success');
-                    } 
+                        console.log("🎯 Power bar başlatılıyor...");
+                        this.startPowerBar(catapult, catapult.loadedStone);
+                        this.showNotification("🎯 Doğru zamanda tıklayarak atış gücünü belirleyin!", 3000, 'info');
+                    }
                     // Taş yok uyarısı
                     else {
                         this.showNotification("⚠️ Önce bir taş toplamalısınız!", 3000, 'warning');
@@ -1459,8 +1472,7 @@ class App {
             notificationElement.style.opacity = '0';
             notificationElement.style.transform = 'translateX(-50%) translateY(20px)';        }, duration);
     }
-    
-    // Envanter UI'nı güncelleyen fonksiyon
+      // Envanter UI'nı güncelleyen fonksiyon
     updateInventoryUI() {
         const inventoryElement = document.getElementById('inventory-status');
         if (!inventoryElement) return;
@@ -1474,6 +1486,163 @@ class App {
             inventoryElement.style.color = '#666';
             inventoryElement.style.fontWeight = 'normal';
         }
+    }
+
+    // Power Bar Sistemi Metodları
+    initializePowerBar() {
+        this.powerBarContainer = document.getElementById('power-bar-container');
+        this.powerMarker = document.getElementById('power-marker');
+        
+        if (!this.powerBarContainer || !this.powerMarker) {
+            console.error("Power bar elementleri bulunamadı!");
+            return;
+        }
+        
+        // Power bar click event'i (marker'ı durdurmak için)
+        this.powerBarContainer.addEventListener('click', (event) => {
+            if (this.powerBarActive) {
+                event.stopPropagation();
+                this.stopPowerBar();
+            }
+        });
+        
+        console.log("🎯 Power bar sistemi başlatıldı");
+    }
+
+    startPowerBar(catapult, stone) {
+        if (this.powerBarActive) return;
+        
+        this.powerBarActive = true;
+        this.pendingCatapult = catapult;
+        this.pendingStone = stone;
+        this.markerPosition = 0;
+        this.markerDirection = 1;
+        
+        // Power bar'ı göster
+        this.powerBarContainer.classList.remove('hidden');
+        
+        // Marker animasyonunu başlat
+        this.animatePowerBar();
+        
+        console.log("🎯 Power bar başlatıldı");
+    }
+
+    animatePowerBar() {
+        if (!this.powerBarActive) return;
+        
+        // Marker pozisyonunu güncelle
+        this.markerPosition += this.markerDirection * this.markerSpeed;
+        
+        // Sınırlarda bounce yap
+        if (this.markerPosition >= 100) {
+            this.markerPosition = 100;
+            this.markerDirection = -1;
+        } else if (this.markerPosition <= 0) {
+            this.markerPosition = 0;
+            this.markerDirection = 1;
+        }
+        
+        // Marker'ın görsel pozisyonunu güncelle
+        if (this.powerMarker) {
+            this.powerMarker.style.left = this.markerPosition + '%';
+        }
+        
+        // Animasyonu devam ettir
+        this.animationId = requestAnimationFrame(() => this.animatePowerBar());
+    }
+
+    stopPowerBar() {
+        if (!this.powerBarActive) return;
+        
+        this.powerBarActive = false;
+        
+        // Animasyonu durdur
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        
+        // Power level'ını hesapla
+        const powerLevel = this.evaluateShot(this.markerPosition);
+        
+        // Power bar'ı gizle
+        this.powerBarContainer.classList.add('hidden');
+        
+        // Atışı gerçekleştir
+        this.executeShot(powerLevel);
+        
+        console.log("🎯 Power bar durduruldu, güç seviyesi:", powerLevel);
+    }
+
+    evaluateShot(position) {
+        let power = 0;
+        let message = "";
+        let points = 0;
+        
+        // Bölgelere göre güç ve puan hesapla
+        if (position >= 40 && position <= 60) {
+            // Yeşil bölge (merkez) - Perfect shot
+            power = 0.9 + (Math.random() * 0.1); // 0.9-1.0 güç
+            message = "🎯 Mükemmel! +15 puan";
+            points = 15;
+        } else if ((position >= 25 && position < 40) || (position > 60 && position <= 75)) {
+            // Sarı bölgeler - Good shot
+            power = 0.7 + (Math.random() * 0.2); // 0.7-0.9 güç
+            message = "👍 İyi atış! +7 puan";
+            points = 7;
+        } else {
+            // Kırmızı bölgeler - Miss/Weak shot
+            power = 0.3 + (Math.random() * 0.3); // 0.3-0.6 güç
+            message = "💥 Kaçtı! +1 puan";
+            points = 1;
+        }
+        
+        // Puan ekle
+        this.addScore(points);
+        
+        // Feedback göster
+        this.showNotification(message, 2500, points >= 10 ? 'success' : points >= 5 ? 'warning' : 'error');
+        
+        return power;
+    }
+
+    executeShot(powerLevel) {
+        if (!this.pendingCatapult || !this.pendingStone) {
+            console.error("Pending catapult veya stone bulunamadı!");
+            return;
+        }
+        
+        // Mancınık launch metodunu güç seviyesi ile çağır
+        const stone = this.pendingCatapult.launch(powerLevel);
+        
+        if (stone && this.sceneManager) {
+            // Scene manager'da stone physics'ini başlat
+            this.sceneManager.startStonePhysics(stone, powerLevel);
+        }
+        
+        // Ses efekti (güç seviyesine göre volume)
+        if (window.getSesYoneticisi) {
+            const volume = Math.min(powerLevel + 0.3, 1.0);
+            window.getSesYoneticisi().catapultAtesle(volume);
+        }
+        
+        // Pending referansları temizle
+        this.pendingCatapult = null;
+        this.pendingStone = null;
+        
+        console.log("🚀 Atış gerçekleştirildi, güç seviyesi:", powerLevel);
+    }
+
+    addScore(points) {
+        const currentScore = parseInt(this.scoreElement.textContent) || 0;
+        const newScore = currentScore + points;
+        this.scoreElement.textContent = newScore.toString();
+        
+        // Score artış animasyonu için class ekle
+        this.scoreElement.classList.add('score-update');
+        setTimeout(() => {
+            this.scoreElement.classList.remove('score-update');
+        }, 500);
     }
 }
 

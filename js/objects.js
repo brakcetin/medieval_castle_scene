@@ -223,7 +223,7 @@ export class Catapult {
             return true;
         }
         return false;
-    }    launch() {
+    }    launch(powerLevel = 0.8) {
         if (this.hasStone && this.loadedStone) {
             const stone = this.loadedStone;
             this.hasStone = false;
@@ -232,6 +232,7 @@ export class Catapult {
             // Taşı fırlat
             stone.isLaunched = true;
             stone.isStatic = false; // Statik durumdan çıkar, fizik etkisi başlasın
+            stone.powerLevel = powerLevel; // Güç seviyesini stone'a ata
             
             // Mancınık animasyonunu başlat
             this.animating = true;
@@ -241,12 +242,13 @@ export class Catapult {
             // böylece atış sonrası tekrar toplanabilmez
             stone.isCollected = false;
             
-            // Mancınık ateşleme sesini çal
+            // Mancınık ateşleme sesini çal (güç seviyesine göre volume)
             if (window.getSesYoneticisi) {
-                window.getSesYoneticisi().catapultAtesle();
+                const volume = Math.min(powerLevel + 0.3, 1.0);
+                window.getSesYoneticisi().catapultAtesle(volume);
             }
             
-            console.log("Mancınıktan taş fırlatıldı");
+            console.log("Mancınıktan taş fırlatıldı, güç seviyesi:", powerLevel);
             
             return stone;
         }

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Bar Test - Ortaçağ Kale Sahnesi</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="score-panel">Puan: <span id="score">0</span></div>
+    
+    <!-- Inventory Indicator -->
+    <div id="inventory-panel">
+        <span id="inventory-status">🎒 Envanter: Boş</span>
+    </div>
+    
+    <div id="controls-panel">
+        <button id="day-night-toggle">Gece/Gündüz</button>
+    </div>
+
+    <div id="instructions">
+        <h3>Power Bar Test:</h3>
+        <p><strong>W, A, S, D</strong> - Hareket</p>
+        <p><strong>Sol Tık + Sürükle</strong> - Kamera</p>
+        <p><strong>Kayalara Tık</strong> - Taş Topla</p>
+        <p><strong>Mancınığa Tık</strong> - Yükle/Fırlat</p>
+        <p><strong>🎯 Güç Barı:</strong> Tık veya <strong>Space</strong> ile dur</p>
+        <p><strong>F</strong> - El Meşalesi Aç/Kapat</p>
+        <div style="color: #FFD700; margin-top: 10px; font-weight: bold;">
+            ✨ Power Bar aktif! Yeşil bölgede durmaya çalışın!
+        </div>
+    </div>
+
+    <!-- Power Bar UI -->
+    <div id="power-bar-container" class="hidden">
+        <div id="power-bar-title">🎯 Nişan Alma - Doğru Zamanda Tıkla!</div>
+        <div id="power-bar">
+            <div class="zone red-zone"></div>
+            <div class="zone yellow-zone"></div>
+            <div class="zone green-zone"></div>
+            <div class="zone yellow-zone"></div>
+            <div class="zone red-zone"></div>
+            <div id="power-marker"></div>
+        </div>
+        <div id="power-bar-instruction">Tıklayarak atışı gerçekleştir</div>
+    </div>
+
+    <div id="time-control-panel" style="display: none;">
+        <h4>Zaman Kontrolü</h4>
+        <label for="time-slider">Saat: <span id="time-display">12</span></label>
+        <input type="range" id="time-slider" min="0" max="24" step="0.5" value="12">
+        <p>Gece: 20-6, Gündüz: 6-20</p>
+    </div>
+
+    <div id="loading">Yükleniyor...</div>
+    <canvas id="scene-canvas"></canvas>
+
+    <!-- Test Information Panel -->
+    <div style="position: fixed; top: 120px; left: 20px; background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 8px; font-size: 12px; max-width: 300px; z-index: 100;">
+        <h4 style="color: #FFD700;">🎯 Power Bar Test Bilgileri:</h4>
+        <ul style="margin: 8px 0; padding-left: 15px;">
+            <li><strong>Kırmızı bölge:</strong> 1 puan (zayıf atış)</li>
+            <li><strong>Sarı bölge:</strong> 7 puan (iyi atış)</li>
+            <li><strong>Yeşil bölge:</strong> 15 puan (mükemmel!)</li>
+        </ul>
+        <p style="font-size: 11px; color: #AAA; margin-top: 8px;">
+            Taş toplayın → Mancınığa yükleyin → Power bar'da doğru zamanda tıklayın!
+        </p>
+    </div>
+
+    <!-- Three.js ve İlgili Kütüphaneler -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/dat.gui@0.7.9/build/dat.gui.min.js"></script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

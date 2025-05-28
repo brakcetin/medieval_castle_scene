@@ -240,3 +240,130 @@ body {
     text-align: center;
     margin-top: 5px;
 }
+
+/* Power Bar UI */
+#power-bar-container {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 500px;
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 15px;
+    padding: 20px;
+    z-index: 100;
+    text-align: center;
+    border: 3px solid #fff;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+#power-bar-container.hidden {
+    display: none !important;
+}
+
+#power-bar-title {
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+#power-bar {
+    background: rgba(255, 255, 255, 0.1);
+    height: 40px;
+    border-radius: 20px;
+    border: 2px solid #fff;
+    position: relative;
+    display: flex;
+    overflow: hidden;
+    margin: 15px 0;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.zone {
+    flex: 1;
+    height: 100%;
+    transition: all 0.3s ease;
+    border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.zone:last-child {
+    border-right: none;
+}
+
+.red-zone {
+    background: linear-gradient(to bottom, 
+        rgba(255, 0, 0, 0.9), 
+        rgba(200, 0, 0, 0.8));
+    box-shadow: inset 0 0 10px rgba(255, 0, 0, 0.3);
+}
+
+.yellow-zone {
+    background: linear-gradient(to bottom, 
+        rgba(255, 200, 0, 0.9), 
+        rgba(255, 150, 0, 0.8));
+    box-shadow: inset 0 0 10px rgba(255, 200, 0, 0.3);
+}
+
+.green-zone {
+    background: linear-gradient(to bottom, 
+        rgba(0, 255, 0, 0.9), 
+        rgba(0, 200, 0, 0.8));
+    box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.3);
+    border-left: 2px solid rgba(255, 255, 255, 0.5);
+    border-right: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+#power-marker {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 6px;
+    height: 46px;
+    background: linear-gradient(to bottom, #fff, #ddd);
+    border: 2px solid #000;
+    border-radius: 3px;
+    box-shadow: 
+        0 0 10px rgba(255, 255, 255, 0.8),
+        0 0 20px rgba(255, 255, 255, 0.4);
+    transition: none;
+    pointer-events: none;
+}
+
+#power-bar-instruction {
+    color: #fff;
+    font-size: 14px;
+    margin-top: 10px;
+    opacity: 0.8;
+    animation: pulse-instruction 2s infinite;
+}
+
+/* Score update animation */
+.score-update {
+    animation: scoreIncrease 0.5s ease-out;
+    color: #4CAF50 !important;
+}
+
+@keyframes scoreIncrease {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse-instruction {
+    0%, 100% { 
+        opacity: 0.8;
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}
