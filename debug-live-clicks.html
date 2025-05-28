@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Canlı Tıklama Analizi</title>
+    <style>
+        body {
+            font-family: 'Consolas', monospace;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #000;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #00ff00;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ff0000;
+            text-shadow: 0 0 10px #ff0000;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+        
+        .monitor {
+            background: #111;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #333;
+            height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        
+        .error { color: #ff0000; }
+        .warning { color: #ffff00; }
+        .success { color: #00ff00; }
+        .info { color: #00ffff; }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            background: #222;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 CANLI TIKLAMA ANALİZİ</h1>
+        
+        <div class="controls">
+            <button onclick="startMonitoring()">🎯 İzlemeyi Başlat</button>
+            <button onclick="stopMonitoring()">⏹️ İzlemeyi Durdur</button>
+            <button onclick="simulateClick()">🖱️ Test Tıklaması</button>
+            <button onclick="checkStoneStates()">📊 Taş Durumları</button>
+            <button onclick="interceptClicks()">🕵️ Tıklamaları Yakala</button>
+            <button onclick="clearLog()">🧹 Temizle</button>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-value" id="click-count">0</div>
+                <div>Toplam Tıklama</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="collection-count">0</div>
+                <div>Başarılı Toplama</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="visible-stones">?</div>
+                <div>Görünür Taş</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="score">0</div>
+                <div>Skor</div>
+            </div>
+        </div>
+        
+        <div class="monitor" id="log"></div>
+    </div>
+
+    <script>
+        let monitoring = false;
+        let clickCount = 0;
+        let collectionCount = 0;
+        let originalOnClick = null;
+        let originalCollect = null;
+        
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const className = type;
+            logEl.innerHTML += `<span class="${className}">[${time}] ${message}</span>\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function updateStats() {
+            document.getElementById('click-count').textContent = clickCount;
+            document.getElementById('collection-count').textContent = collectionCount;
+            
+            if (window.app && window.app.sceneManager) {
+                const stones = window.app.sceneManager.objects.stones || [];
+                const visible = stones.filter(s => s && s.mesh && s.mesh.visible).length;
+                document.getElementById('visible-stones').textContent = visible;
+                
+                if (window.app.score !== undefined) {
+                    document.getElementById('score').textContent = window.app.score;
+                }
+            }
+        }
+        
+        function startMonitoring() {
+            if (monitoring) return;
+            monitoring = true;
+            
+            log("🎯 İzleme başlatıldı", "success");
+            
+            // Hook into the main click handler
+            if (window.app && window.app.onClick) {
+                originalOnClick = window.app.onClick;
+                window.app.onClick = function(event) {
+                    clickCount++;
+                    log(`🖱️ CLICK ${clickCount} DETECTED`, "info");
+                    log(`  Mouse: (${event.clientX}, ${event.clientY})`, "info");
+                    
+                    // Call original and capture result
+                    const result = originalOnClick.call(this, event);
+                    
+                    log(`  Click handler result: ${result}`, result ? "success" : "warning");
+                    updateStats();
+                    
+                    return result;
+                };
+                log("✅ Click handler hooked", "success");
+            }
+            
+            // Hook into stone collect methods
+            if (window.app && window.app.sceneManager && window.app.sceneManager.objects.stones) {
+                window.app.sceneManager.objects.stones.forEach((stone, index) => {
+                    if (stone && stone.collect && !stone._originalCollect) {
+                        stone._originalCollect = stone.collect;
+                        stone.collect = function() {
+                            log(`🗿 STONE ${index + 1} COLLECT CALLED`, "warning");
+                            log(`  Before: visible=${this.mesh ? this.mesh.visible : 'no mesh'}, collected=${this.isCollected}`, "info");
+                            
+                            const result = stone._originalCollect.call(this);
+                            
+                            setTimeout(() => {
+                                log(`  After: visible=${this.mesh ? this.mesh.visible : 'no mesh'}, collected=${this.isCollected}`, "info");
+                                log(`  Result: ${result}`, result ? "success" : "error");
+                                
+                                if (result) {
+                                    collectionCount++;
+                                    if (this.mesh && this.mesh.visible) {
+                                        log(`❌ PROBLEM: Stone collected but still visible!`, "error");
+                                    } else {
+                                        log(`✅ OK: Stone collected and invisible`, "success");
+                                    }
+                                }
+                                updateStats();
+                            }, 10);
+                            
+                            return result;
+                        };
+                    }
+                });
+                log(`✅ Hooked ${window.app.sceneManager.objects.stones.length} stone collect methods`, "success");
+            }
+            
+            updateStats();
+        }
+        
+        function stopMonitoring() {
+            if (!monitoring) return;
+            monitoring = false;
+            
+            // Restore original handlers
+            if (window.app && originalOnClick) {
+                window.app.onClick = originalOnClick;
+                originalOnClick = null;
+            }
+            
+            if (window.app && window.app.sceneManager && window.app.sceneManager.objects.stones) {
+                window.app.sceneManager.objects.stones.forEach(stone => {
+                    if (stone && stone._originalCollect) {
+                        stone.collect = stone._originalCollect;
+                        delete stone._originalCollect;
+                    }
+                });
+            }
+            
+            log("⏹️ İzleme durduruldu", "warning");
+        }
+        
+        function simulateClick() {
+            if (!window.app) {
+                log("❌ Game not loaded", "error");
+                return;
+            }
+            
+            log("🖱️ Test tıklaması simülasyonu", "info");
+            
+            // Find a visible stone
+            const stones = window.app.sceneManager.objects.stones || [];
+            const visibleStone = stones.find(s => s && s.mesh && s.mesh.visible && !s.isCollected);
+            
+            if (!visibleStone) {
+                log("❌ No visible stones found for test", "error");
+                return;
+            }
+            
+            log(`🗿 Test stone found at position: (${visibleStone.mesh.position.x.toFixed(2)}, ${visibleStone.mesh.position.y.toFixed(2)}, ${visibleStone.mesh.position.z.toFixed(2)})`, "info");
+            
+            // Direct collect call
+            const beforeVisible = visibleStone.mesh.visible;
+            const beforeCollected = visibleStone.isCollected;
+            
+            log(`📊 Before: visible=${beforeVisible}, collected=${beforeCollected}`, "info");
+            
+            const result = visibleStone.collect();
+            
+            setTimeout(() => {
+                const afterVisible = visibleStone.mesh ? visibleStone.mesh.visible : false;
+                const afterCollected = visibleStone.isCollected;
+                
+                log(`📊 After: visible=${afterVisible}, collected=${afterCollected}, result=${result}`, "info");
+                
+                if (result && !afterVisible) {
+                    log("✅ SUCCESS: Direct collect worked correctly", "success");
+                } else {
+                    log("❌ PROBLEM: Direct collect didn't work as expected", "error");
+                }
+                
+                updateStats();
+            }, 50);
+        }
+        
+        function checkStoneStates() {
+            if (!window.app || !window.app.sceneManager) {
+                log("❌ Game not loaded", "error");
+                return;
+            }
+            
+            log("📊 === STONE STATES ANALYSIS ===", "info");
+            
+            const stones = window.app.sceneManager.objects.stones || [];
+            log(`🗿 Total stones: ${stones.length}`, "info");
+            
+            let totalVisible = 0;
+            let totalCollected = 0;
+            let totalProcessing = 0;
+            
+            stones.forEach((stone, index) => {
+                if (stone) {
+                    const visible = stone.mesh ? stone.mesh.visible : false;
+                    const collected = stone.isCollected || false;
+                    const processing = stone.isBeingCollected || false;
+                    
+                    if (visible) totalVisible++;
+                    if (collected) totalCollected++;
+                    if (processing) totalProcessing++;
+                    
+                    const status = visible ? "👁️" : "🚫";
+                    const collectStatus = collected ? "✅" : "⭕";
+                    const processStatus = processing ? "⏳" : "⭕";
+                    
+                    log(`  Stone ${index + 1}: ${status} ${collectStatus} ${processStatus} | Visible=${visible}, Collected=${collected}, Processing=${processing}`, "info");
+                    
+                    // Check if stone is in scene
+                    if (stone.mesh) {
+                        let inScene = false;
+                        window.app.sceneManager.scene.traverse((child) => {
+                            if (child === stone.mesh) inScene = true;
+                        });
+                        if (!inScene && visible) {
+                            log(`    ⚠️ Stone ${index + 1} marked visible but not in scene!`, "warning");
+                        }
+                    }
+                }
+            });
+            
+            log(`📊 Summary: ${totalVisible} visible, ${totalCollected} collected, ${totalProcessing} processing`, "info");
+            updateStats();
+        }
+        
+        function interceptClicks() {
+            log("🕵️ Setting up click interception", "info");
+            
+            // Intercept ALL mouse clicks on the document
+            document.addEventListener('click', function(event) {
+                if (monitoring) {
+                    log(`🖱️ RAW CLICK: (${event.clientX}, ${event.clientY}) on ${event.target.tagName}`, "info");
+                }
+            }, true);
+            
+            // Intercept canvas clicks specifically
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+                canvas.addEventListener('click', function(event) {
+                    if (monitoring) {
+                        log(`🎨 CANVAS CLICK: (${event.clientX}, ${event.clientY})`, "warning");
+                        
+                        // Try to get raycast info
+                        if (window.app && window.app.raycaster) {
+                            const mouse = new THREE.Vector2();
+                            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                            
+                            window.app.raycaster.setFromCamera(mouse, window.app.camera);
+                            const intersects = window.app.raycaster.intersectObjects(window.app.sceneManager.scene.children, true);
+                            
+                            log(`  Raycaster found ${intersects.length} intersections`, "info");
+                            if (intersects.length > 0) {
+                                const obj = intersects[0].object;
+                                log(`  First hit: ${obj.type} ${obj.name || 'unnamed'} visible=${obj.visible}`, "info");
+                            }
+                        }
+                    }
+                }, true);
+                log("✅ Canvas click interception set up", "success");
+            } else {
+                log("❌ Canvas not found", "error");
+            }
+        }
+        
+        // Auto-start monitoring when page loads
+        window.addEventListener('load', () => {
+            log("🚀 Debug page loaded", "success");
+            setTimeout(() => {
+                if (window.app) {
+                    log("✅ Game detected, starting monitoring", "success");
+                    startMonitoring();
+                    interceptClicks();
+                } else {
+                    log("⚠️ Game not loaded yet, please start monitoring manually", "warning");
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

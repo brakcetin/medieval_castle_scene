@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Catapult Loading Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .status-card {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .status-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        
+        .test-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+        
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+        }
+        
+        .test-btn.critical {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+        }
+        
+        .test-btn.critical:hover {
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.6);
+        }
+        
+        .results {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #4CAF50;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        .step.error {
+            border-color: #f44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+        
+        .step.warning {
+            border-color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏹 Live Catapult Loading Test</h1>
+        
+        <div class="test-section">
+            <h3>🎯 Real-Time System Status</h3>
+            <div class="status-grid">
+                <div class="status-card">
+                    <div>App Status</div>
+                    <div class="status-value" id="app-status">Checking...</div>
+                </div>
+                <div class="status-card">
+                    <div>Catapult Status</div>
+                    <div class="status-value" id="catapult-status">Checking...</div>
+                </div>
+                <div class="status-card">
+                    <div>Scene Access</div>
+                    <div class="status-value" id="scene-status">Checking...</div>
+                </div>
+                <div class="status-card">
+                    <div>Inventory Status</div>
+                    <div class="status-value" id="inventory-status">Checking...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔧 Live Testing Controls</h3>
+            <div style="text-align: center;">
+                <button class="test-btn" onclick="testCatapultLoading()">🏹 Test Catapult Loading</button>
+                <button class="test-btn" onclick="simulateCollection()">🗿 Simulate Collection</button>
+                <button class="test-btn" onclick="testFullFlow()">⚡ Test Full Flow</button>
+                <button class="test-btn critical" onclick="clearResults()">🧹 Clear Results</button>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div class="results" id="test-results">
+                Live catapult test ready...<br>
+                This test will verify the catapult loading fix in real-time.
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+        
+        function addResult(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const resultDiv = document.getElementById('test-results');
+            const step = document.createElement('div');
+            step.className = `step ${type}`;
+            step.innerHTML = `[${timestamp}] ${message}`;
+            resultDiv.appendChild(step);
+            resultDiv.scrollTop = resultDiv.scrollHeight;
+        }
+        
+        function updateStatus() {
+            let app = null;
+            
+            // Try multiple ways to get app reference
+            if (window.opener && window.opener.app) {
+                app = window.opener.app;
+            } else if (window.parent && window.parent.app) {
+                app = window.parent.app;
+            } else if (window.app) {
+                app = window.app;
+            }
+            
+            // App status
+            const appStatus = document.getElementById('app-status');
+            if (app) {
+                appStatus.textContent = 'Connected ✅';
+                appStatus.className = 'status-value success';
+            } else {
+                appStatus.textContent = 'Not Found ❌';
+                appStatus.className = 'status-value error';
+                return;
+            }
+            
+            // Catapult status
+            const catapultStatus = document.getElementById('catapult-status');
+            const catapult = app.sceneManager?.objects?.catapult;
+            if (catapult) {
+                const hasStone = catapult.hasStone ? 'Loaded' : 'Empty';
+                catapultStatus.textContent = `${hasStone} ✅`;
+                catapultStatus.className = 'status-value success';
+            } else {
+                catapultStatus.textContent = 'Not Found ❌';
+                catapultStatus.className = 'status-value error';
+            }
+            
+            // Scene access status
+            const sceneStatus = document.getElementById('scene-status');
+            if (catapult && catapult.scene && catapult.scene.scene) {
+                sceneStatus.textContent = 'Working ✅';
+                sceneStatus.className = 'status-value success';
+            } else {
+                sceneStatus.textContent = 'Failed ❌';
+                sceneStatus.className = 'status-value error';
+            }
+            
+            // Inventory status
+            const inventoryStatus = document.getElementById('inventory-status');
+            const inventory = app.playerInventory;
+            if (inventory && inventory.hasRock) {
+                inventoryStatus.textContent = 'Has Stone 🗿';
+                inventoryStatus.className = 'status-value success';
+            } else {
+                inventoryStatus.textContent = 'Empty 🎒';
+                inventoryStatus.className = 'status-value info';
+            }
+        }
+        
+        window.testCatapultLoading = function() {
+            addResult('🔍 Testing catapult loading functionality...', 'info');
+            
+            let app = window.opener?.app || window.parent?.app || window.app;
+            if (!app) {
+                addResult('❌ App not accessible', 'error');
+                return;
+            }
+            
+            const catapult = app.sceneManager?.objects?.catapult;
+            if (!catapult) {
+                addResult('❌ Catapult not found', 'error');
+                return;
+            }
+            
+            addResult('✅ Catapult found', 'info');
+            
+            // Test scene access
+            if (catapult.scene && catapult.scene.scene && typeof catapult.scene.scene.add === 'function') {
+                addResult('✅ Scene access is working (this.scene.scene.add available)', 'success');
+            } else {
+                addResult('❌ Scene access problem detected', 'error');
+                return;
+            }
+            
+            // Check if we have a stone to test with
+            if (!app.playerInventory || !app.playerInventory.hasRock) {
+                addResult('⚠️ No stone in inventory, simulating collection first...', 'warning');
+                simulateCollection();
+                return;
+            }
+            
+            // Test actual loading
+            const stone = app.playerInventory.collectedStone;
+            if (!stone) {
+                addResult('❌ No collected stone found', 'error');
+                return;
+            }
+            
+            addResult('🏹 Attempting to load stone into catapult...', 'info');
+            
+            try {
+                const loadResult = catapult.loadStone(stone);
+                
+                if (loadResult) {
+                    addResult('✅ Stone loaded successfully! No errors!', 'success');
+                    
+                    if (stone.mesh) {
+                        addResult('✅ Stone mesh exists in catapult', 'success');
+                    }
+                    
+                    if (catapult.hasStone) {
+                        addResult('✅ Catapult shows stone is loaded', 'success');
+                    }
+                    
+                    addResult('🎯 CATAPULT LOADING FIX IS WORKING!', 'success');
+                } else {
+                    addResult('❌ Stone loading failed', 'error');
+                }
+                
+            } catch (error) {
+                if (error.message.includes('this.scene.add is not a function')) {
+                    addResult('❌ THE BUG IS STILL PRESENT!', 'error');
+                    addResult(`Error details: ${error.message}`, 'error');
+                } else {
+                    addResult(`❌ Different error: ${error.message}`, 'error');
+                }
+            }
+            
+            updateStatus();
+        };
+        
+        window.simulateCollection = function() {
+            addResult('🗿 Simulating stone collection...', 'info');
+            
+            let app = window.opener?.app || window.parent?.app || window.app;
+            if (!app) {
+                addResult('❌ App not accessible', 'error');
+                return;
+            }
+            
+            // Find an available stone
+            const stones = app.sceneManager?.objects?.stones || [];
+            const availableStone = stones.find(s => s && !s.isCollected && !s.isBeingCollected);
+            
+            if (!availableStone) {
+                addResult('⚠️ No available stones, creating test stone...', 'warning');
+                
+                // Create a test stone
+                const testStone = {
+                    isCollected: false,
+                    isBeingCollected: false,
+                    isLaunched: false,
+                    mesh: null,
+                    position: new THREE.Vector3(0, 1, 5),
+                    collect: function() {
+                        this.isCollected = true;
+                        this.isBeingCollected = true;
+                        if (this.mesh) {
+                            this.mesh.visible = false;
+                            this.mesh = null;
+                        }
+                        return true;
+                    }
+                };
+                
+                stones.push(testStone);
+                addResult('✅ Test stone created', 'success');
+                
+                // Collect it
+                testStone.collect();
+                app.playerInventory = app.playerInventory || {};
+                app.playerInventory.hasRock = true;
+                app.playerInventory.collectedStone = testStone;
+                
+                addResult('✅ Test stone collected', 'success');
+            } else {
+                addResult('✅ Found available stone, collecting...', 'success');
+                
+                // Collect the stone
+                availableStone.collect();
+                app.playerInventory = app.playerInventory || {};
+                app.playerInventory.hasRock = true;
+                app.playerInventory.collectedStone = availableStone;
+                
+                addResult('✅ Real stone collected', 'success');
+            }
+            
+            updateStatus();
+        };
+        
+        window.testFullFlow = function() {
+            addResult('⚡ Testing full collection → loading → catapult flow...', 'info');
+            
+            // First simulate collection
+            simulateCollection();
+            
+            // Wait a bit then test loading
+            setTimeout(() => {
+                testCatapultLoading();
+            }, 1000);
+        };
+        
+        window.clearResults = function() {
+            document.getElementById('test-results').innerHTML = 'Results cleared...<br>';
+        };
+        
+        // Auto-update status every 2 seconds
+        setInterval(updateStatus, 2000);
+        updateStatus();
+        
+        // Initial messages
+        addResult('🚀 Live catapult test initialized', 'info');
+        addResult('🔄 Monitoring for app connection...', 'info');
+        
+        // Check for app every 3 seconds and run auto-test when available
+        let autoTestRun = false;
+        const checkForApp = setInterval(() => {
+            const app = window.opener?.app || window.parent?.app || window.app;
+            if (app && !autoTestRun) {
+                addResult('✅ App connection detected!', 'success');
+                addResult('🔄 Running initial verification...', 'info');
+                autoTestRun = true;
+                
+                setTimeout(() => {
+                    testFullFlow();
+                }, 2000);
+                
+                clearInterval(checkForApp);
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

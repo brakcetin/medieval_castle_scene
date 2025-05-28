@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medieval Castle - Stone Click Validation</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        .validation-overlay {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #4CAF50;
+            z-index: 1000;
+            max-width: 300px;
+            font-size: 12px;
+        }
+        
+        .validation-overlay h3 {
+            margin: 0 0 10px 0;
+            color: #4CAF50;
+        }
+        
+        .status {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        
+        .success { background: rgba(76, 175, 80, 0.2); }
+        .error { background: rgba(244, 67, 54, 0.2); }
+        .warning { background: rgba(255, 152, 0, 0.2); }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 11px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="validation-overlay">
+        <h3>🏰 Stone Click Validator</h3>
+        <div id="validationStatus">
+            <div class="status">🔄 Initializing...</div>
+        </div>
+        <button onclick="runValidation()">🧪 Validate</button>
+        <button onclick="testCollection()">🎯 Test Collection</button>
+        <button onclick="toggleOverlay()">👁️ Hide</button>
+    </div>
+
+    <!-- Include Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Include dat.GUI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+    
+    <!-- Include game scripts -->
+    <script src="js/scene.js"></script>
+    <script src="js/lights.js"></script>
+    <script src="js/objects.js"></script>
+    <script src="js/main.js"></script>
+    
+    <!-- Include validation script -->
+    <script src="final-validation.js"></script>
+    
+    <script>
+        let overlayVisible = true;
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('validationStatus');
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : type === 'warning' ? 'warning' : '';
+            statusDiv.innerHTML = `<div class="status ${className}">${message}</div>`;
+        }
+        
+        function runValidation() {
+            updateStatus('🔄 Running validation...', 'info');
+            setTimeout(() => {
+                if (window.validateStoneClicking) {
+                    const isValid = window.validateStoneClicking();
+                    if (isValid) {
+                        updateStatus('✅ Validation passed! Stones are clickable.', 'success');
+                    } else {
+                        updateStatus('❌ Validation failed! Check console for details.', 'error');
+                    }
+                } else {
+                    updateStatus('❌ Validation function not available.', 'error');
+                }
+            }, 100);
+        }
+        
+        function testCollection() {
+            updateStatus('🧪 Testing stone collection...', 'info');
+            setTimeout(() => {
+                if (window.testStoneCollection) {
+                    window.testStoneCollection();
+                    updateStatus('🎯 Collection test completed. Check console.', 'success');
+                } else {
+                    updateStatus('❌ Test function not available.', 'error');
+                }
+            }, 100);
+        }
+        
+        function toggleOverlay() {
+            const overlay = document.querySelector('.validation-overlay');
+            if (overlayVisible) {
+                overlay.style.display = 'none';
+                overlayVisible = false;
+            } else {
+                overlay.style.display = 'block';
+                overlayVisible = true;
+            }
+        }
+        
+        // Auto-run validation after game loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                updateStatus('🏰 Game loaded. Ready for validation.', 'success');
+            }, 3000);
+        });
+        
+        // Override console.log to also show in status (for key messages)
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.join(' ');
+            if (message.includes('✅') || message.includes('❌') || message.includes('⚠️')) {
+                updateStatus(message, 
+                    message.includes('✅') ? 'success' : 
+                    message.includes('❌') ? 'error' : 'warning'
+                );
+            }
+        };
+    </script>
+</body>
+</html>

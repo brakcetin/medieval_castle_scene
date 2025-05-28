@@ -145,11 +145,56 @@ export class Catapult {
     startCharging() {
         this.charging = true;
         this.power = 20;
-    }
-      loadStone(stone) {
+    }    loadStone(stone) {
         if (!this.hasStone && stone && !stone.isLaunched) {
             this.hasStone = true;
             this.loadedStone = stone;
+            
+            console.log("💎 Loading stone into catapult...");
+            
+            // Eğer taş collect edilmişse ve mesh'i yoksa, yeni mesh oluştur
+            if (stone.isCollected && !stone.mesh) {
+                console.log("🔄 Creating new mesh for collected stone");
+                
+                // Basit bir taş mesh'i oluştur
+                const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: 0x8B4513,
+                    roughness: 0.8,
+                    metalness: 0.1
+                });
+                
+                stone.mesh = new THREE.Mesh(geometry, material);
+                stone.mesh.castShadow = true;
+                stone.mesh.receiveShadow = true;
+                stone.mesh.userData = {
+                    type: 'catapult_stone',
+                    isClickable: false                };
+                  // Scene'e ekle (SceneManager üzerinden)
+                console.log("🔍 Checking scene reference:", this.scene);
+                console.log("🔍 Scene.scene property:", this.scene ? this.scene.scene : 'undefined');
+                
+                if (this.scene && this.scene.scene && typeof this.scene.scene.add === 'function') {
+                    this.scene.scene.add(stone.mesh);
+                    console.log("✅ New mesh created and added to scene");
+                } else {
+                    console.error("❌ Scene reference issue:", {
+                        hasScene: !!this.scene,
+                        hasSceneScene: !!(this.scene && this.scene.scene),
+                        sceneType: this.scene ? this.scene.constructor.name : 'undefined',
+                        sceneSceneType: this.scene && this.scene.scene ? this.scene.scene.constructor.name : 'undefined'
+                    });
+                    
+                    // Fallback - try to add directly to scene if it's a THREE.Scene
+                    if (this.scene && typeof this.scene.add === 'function') {
+                        console.log("🔄 Using fallback: adding directly to this.scene");
+                        this.scene.add(stone.mesh);
+                    } else {
+                        console.error("❌ Cannot add stone mesh to scene - no valid scene reference");
+                        return false;
+                    }
+                }
+            }
             
             // Taşı mancınığın kovasına yerleştir
             if (this.bucket && stone.mesh) {
@@ -166,7 +211,13 @@ export class Catapult {
                 // Taşın görünür olduğundan emin ol
                 stone.mesh.visible = true;
                 
-                console.log("Taş mancınığa yüklendi, pozisyon:", stone.mesh.position);
+                // Collection state'ini sıfırla
+                if (stone.isCollected) {
+                    stone.isCollected = false;
+                    stone.isBeingCollected = false;                    console.log("🔄 Collected stone state reset for catapult loading");
+                }
+                
+                console.log("✅ Taş mancınığa yüklendi, pozisyon:", stone.mesh.position);
             }
             
             return true;
@@ -212,10 +263,10 @@ export class Stone {
         this.velocity = new THREE.Vector3();
         this.radius = 0.3; // Yarıçapı küçülttük
         this.lifetime = 10;
-        this.active = true;
-        this.isStatic = true;
+        this.active = true;        this.isStatic = true;
         this.isLaunched = false;
         this.isCollected = false; // Toplama durumu için yeni özellik
+        this.isBeingCollected = false; // Toplama işlemi devam ediyor mu kontrolü
     }
       load() {
         console.log("Stone.load() çağrıldı, pozisyon:", this.position);
@@ -361,28 +412,78 @@ export class Stone {
         const separation = this.radius + collider.radius - this.position.distanceTo(collider.position);
         if (separation > 0) {
             this.position.add(direction.multiplyScalar(separation));
+        }    }      remove() {
+        console.log("Remove method called, active:", this.active);
+        if (!this.active) {
+            console.log("Stone already inactive, skipping removal");
+            return;
         }
-    }      remove() {
-        if (!this.active) return;
         
         this.active = false;
         if (this.mesh) {
-            this.scene.scene.remove(this.mesh); // SceneManager'dan scene'e erişim
+            console.log("Removing stone mesh from scene...");
             
-            // Memory cleanup
+            // Önce mesh'i görünmez yap
+            this.setMeshVisibility(false);
+            
+            // Parent'tan kaldır
+            if (this.mesh.parent) {
+                console.log("Removing from parent:", this.mesh.parent.type);
+                this.mesh.parent.remove(this.mesh);
+            }
+            
+            // Scene'den kaldır
+            if (this.scene && this.scene.scene) {
+                this.scene.scene.remove(this.mesh);
+                console.log("Stone mesh removed from scene successfully");
+                
+                // Scene.children array'inden de manuel olarak kaldır
+                const index = this.scene.scene.children.indexOf(this.mesh);
+                if (index > -1) {
+                    this.scene.scene.children.splice(index, 1);
+                    console.log("Also removed from scene.children array");
+                }
+            } else {
+                console.error("Scene reference not found!");
+            }
+            
+            // Memory cleanup - geometry and materials
             if (this.mesh.geometry) {
                 this.mesh.geometry.dispose();
+                console.log("Geometry disposed");
             }
+            
             if (this.mesh.material) {
                 if (Array.isArray(this.mesh.material)) {
-                    this.mesh.material.forEach(mat => mat.dispose());
+                    this.mesh.material.forEach((mat, index) => {
+                        if (mat && typeof mat.dispose === 'function') {
+                            mat.dispose();
+                            console.log(`Material ${index} disposed`);
+                        }
+                    });
                 } else {
-                    this.mesh.material.dispose();
+                    if (this.mesh.material && typeof this.mesh.material.dispose === 'function') {
+                        this.mesh.material.dispose();
+                        console.log("Material disposed");
+                    }
                 }
             }
             
+            // Child objects cleanup
+            if (this.mesh.children && this.mesh.children.length > 0) {
+                this.mesh.children.forEach((child, index) => {
+                    if (child && child.parent) {
+                        child.parent.remove(child);
+                        console.log(`Child ${index} removed`);
+                    }
+                });
+            }
+            
+            // Son olarak mesh referansını null yap
             this.mesh = null;
-            console.log("Taş başarıyla temizlendi");
+            console.log("Taş başarıyla temizlendi ve null yapıldı");
+        } else {
+            console.log("No mesh to remove");
         }
     }
     
@@ -397,40 +498,176 @@ export class Stone {
     // Taşın fırlatılmasını sağlayan metod
     launch(direction, power) {
         // Taşı statik olmayan ve fırlatılmış olarak işaretle
-        this.isStatic = false;
-        this.isLaunched = true;
+        this.isStatic = false;        this.isLaunched = true;
         
         // Hızını ayarla
         this.velocity.copy(direction).multiplyScalar(power);
     }    // Taşın toplanmasını sağlayan metod
     collect() {
-        if (this.isCollected) {
-            console.log("Stone already collected");
+        console.log("=== STONE COLLECTION BAŞLADI ===");
+        
+        // Çoklu collection'ı önle
+        if (this.isCollected || this.isBeingCollected) {
+            console.log("Stone zaten toplanıyor veya toplandı:", {
+                isCollected: this.isCollected,
+                isBeingCollected: this.isBeingCollected
+            });
             return false;
         }
         
+        // ÖNCE flags'i ayarla - çok önemli!
+        this.isBeingCollected = true;
         this.isCollected = true;
-        console.log("Stone collected successfully!");
         
-        // Toplama animasyonu göster
+        console.log("Stone collection başlatıldı - LOCKED");
+        
+        // Mesh'i ANINDA ve TAMAMEN kaldır
         if (this.mesh) {
-            this.showCollectEffect();
+            console.log("Mesh'i ANINDA ve TAMAMEN yok ediyoruz...");
             
-            // Taşı tamamen kaldır (sadece gizlemek yerine)
-            setTimeout(() => {
-                if (this.mesh) {
-                    // Önce görünmez yap
-                    this.mesh.visible = false;
-                    
-                    // Sonra tamamen kaldır (memory cleanup için)
-                    setTimeout(() => {
-                        this.remove();
-                    }, 100);
+            // 1. Scene'den ANINDA kaldır
+            if (this.mesh.parent) {
+                this.mesh.parent.remove(this.mesh);
+                console.log("✅ Parent'dan kaldırıldı");
+            }
+            
+            // 2. Görünürlüğü KAPAT
+            this.mesh.visible = false;
+            
+            // 3. Geometry ve material'ı DISPOSE et (memory temizliği)
+            if (this.mesh.geometry) {
+                this.mesh.geometry.dispose();
+                console.log("✅ Geometry disposed");
+            }
+            
+            if (this.mesh.material) {
+                if (Array.isArray(this.mesh.material)) {
+                    this.mesh.material.forEach(mat => {
+                        if (mat && typeof mat.dispose === 'function') {
+                            mat.dispose();
+                        }
+                    });
+                } else if (typeof this.mesh.material.dispose === 'function') {
+                    this.mesh.material.dispose();
                 }
-            }, 300); // 300ms sonra taşı gizle (efektten sonra)
+                console.log("✅ Material disposed");
+            }
+            
+            // 4. UserData'yı TAMAMEN temizle
+            this.mesh.userData = {
+                type: 'destroyed_stone',
+                isClickable: false,
+                stoneRef: null
+            };
+            
+            // 5. Tüm child'ları da yok et
+            const children = [...this.mesh.children];
+            children.forEach(child => {
+                this.mesh.remove(child);
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.dispose && mat.dispose());
+                    } else if (child.material.dispose) {
+                        child.material.dispose();
+                    }
+                }
+            });
+            
+            // 6. Position'ı impossibly uzağa taşı
+            this.mesh.position.set(999999, 999999, 999999);
+            
+            // 7. Scale'i sıfırla
+            this.mesh.scale.set(0, 0, 0);
+            
+            // 8. Mesh referansını NULL yap
+            this.mesh = null;
+            
+            console.log("✅ Mesh TAMAMEN yok edildi ve memory'den temizlendi");
         }
         
+        console.log("=== STONE COLLECTION TAMAMLANDI - STONE ARTIK YOK ===");
         return true;
+    }
+    
+    // Taşı sahne'den zorla kaldıran metod
+    forceRemoveFromScene() {
+        if (!this.mesh) {
+            console.log("No mesh to remove");
+            return;
+        }
+        
+        console.log("Force removing mesh from scene...");
+        
+        // Önce mesh'i görünmez yap
+        this.setMeshVisibility(false);
+        
+        // Mesh'i parent'ından kaldır
+        if (this.mesh.parent) {
+            console.log("Removing from parent:", this.mesh.parent.type);
+            this.mesh.parent.remove(this.mesh);
+        }
+        
+        // Scene'den de direkt kaldır
+        if (this.scene && this.scene.scene) {
+            console.log("Removing from scene directly...");
+            this.scene.scene.remove(this.mesh);
+            
+            // Scene.children array'inden de kaldırmayı dene
+            const index = this.scene.scene.children.indexOf(this.mesh);
+            if (index > -1) {
+                this.scene.scene.children.splice(index, 1);
+                console.log("Removed from scene.children array at index:", index);
+            }
+        }
+        
+        // Mesh'i tamamen null yap
+        this.mesh.visible = false;
+        
+        console.log("Stone forcefully removed from scene");
+    }
+    
+    // Mesh ve child meshlerinin görünürlüğünü ayarlayan metod
+    setMeshVisibility(visible) {
+        if (!this.mesh) return;
+        
+        // Ana mesh'i gizle/göster
+        this.mesh.visible = visible;
+        
+        // Tüm child meshlerini de gizle/göster (recursive)
+        this.mesh.traverse((child) => {
+            if (child.isMesh || child.isObject3D) {
+                child.visible = visible;
+            }
+        });
+        
+        // Material'lerin görünürlüğünü de ayarla
+        if (this.mesh.material) {
+            if (Array.isArray(this.mesh.material)) {
+                this.mesh.material.forEach(mat => {
+                    if (mat) {
+                        mat.visible = visible;
+                        if (!visible) {
+                            mat.opacity = 0;
+                            mat.transparent = true;
+                        }
+                    }
+                });
+            } else {
+                this.mesh.material.visible = visible;
+                if (!visible) {
+                    this.mesh.material.opacity = 0;
+                    this.mesh.material.transparent = true;
+                }
+            }
+        }
+        
+        console.log(`Stone mesh visibility set to: ${visible}`);
+    }
+    
+    // Taşın görünürlüğünü ayarlayan helper metod (eski versiyon için uyumluluk)
+    setVisibility(visible) {
+        this.setMeshVisibility(visible);
     }
     
     // Taş toplama efekti

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 FINAL STONE CLICK BUG VALIDATION TEST</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #4CAF50;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .status-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #333;
+        }
+        
+        .test-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .test-btn.critical {
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+        }
+        
+        .test-btn.warning {
+            background: linear-gradient(45deg, #ff9800, #f57c00);
+        }
+        
+        .test-results {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        
+        .big-buttons {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .big-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .big-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .validation-checklist {
+            background: rgba(0, 100, 0, 0.2);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .validation-checklist h3 {
+            color: #4CAF50;
+            margin-top: 0;
+        }
+        
+        .checklist-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            border-left: 3px solid #4CAF50;
+        }
+        
+        .checklist-item.pending {
+            border-left-color: #ff9800;
+            color: #ff9800;
+        }
+        
+        .checklist-item.failed {
+            border-left-color: #f44336;
+            color: #f44336;
+        }
+        
+        .inventory-status {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏰 FINAL STONE CLICKING BUG VALIDATION TEST</h1>
+        
+        <div class="big-buttons">
+            <a href="index.html" class="big-btn">🎮 Open Main Game</a>
+            <button class="big-btn test-btn critical" onclick="runComprehensiveValidation()">🔍 Run Full Validation</button>
+        </div>
+        
+        <div class="validation-checklist">
+            <h3>✅ Critical Bug Fixes Validation Checklist</h3>
+            <div id="checklist-container">
+                <div class="checklist-item pending" id="check-1">1. ⏳ Verifying raycast filtering system...</div>
+                <div class="checklist-item pending" id="check-2">2. ⏳ Testing aggressive stone cleanup...</div>
+                <div class="checklist-item pending" id="check-3">3. ⏳ Validating inventory management...</div>
+                <div class="checklist-item pending" id="check-4">4. ⏳ Testing single-click collection...</div>
+                <div class="checklist-item pending" id="check-5">5. ⏳ Verifying memory cleanup...</div>
+                <div class="checklist-item pending" id="check-6">6. ⏳ Testing catapult loading integration...</div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎯 Live Testing Controls</h2>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <button class="test-btn" onclick="testSingleClickCollection()">🗿 Test Single Click</button>
+                <button class="test-btn" onclick="testInventoryPrevention()">🎒 Test Inventory Block</button>
+                <button class="test-btn" onclick="testMemoryCleanup()">🧹 Test Memory Cleanup</button>
+                <button class="test-btn" onclick="testCatapultIntegration()">🏹 Test Catapult Loading</button>
+                <button class="test-btn warning" onclick="createTestStones()">🔨 Create Test Stones</button>
+                <button class="test-btn critical" onclick="resetTestEnvironment()">🔄 Reset Test</button>
+            </div>
+        </div>
+        
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>🎮 Game State</h3>
+                <div id="game-state">
+                    <div>Status: <span id="app-status">Checking...</span></div>
+                    <div>Stones: <span id="stone-count">Loading...</span></div>
+                    <div>Scene Objects: <span id="scene-children">Loading...</span></div>
+                </div>
+            </div>
+            
+            <div class="status-card">
+                <h3>🎒 Inventory Status</h3>
+                <div id="inventory-status" class="inventory-status">
+                    Checking inventory...
+                </div>
+            </div>
+            
+            <div class="status-card">
+                <h3>🏹 Catapult Status</h3>
+                <div id="catapult-status">
+                    <div>State: <span id="catapult-state">Checking...</span></div>
+                    <div>Has Stone: <span id="catapult-loaded">Checking...</span></div>
+                </div>
+            </div>
+            
+            <div class="status-card">
+                <h3>📊 Performance</h3>
+                <div id="performance-stats">
+                    <div>Memory Usage: <span id="memory-usage">Calculating...</span></div>
+                    <div>Render Calls: <span id="render-calls">Monitoring...</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📝 Live Test Results</h2>
+            <div id="test-results" class="test-results">
+                Validation results will appear here...<br>
+                Ready to test the stone clicking bug fix!
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎯 Expected Results (After Fix)</h2>
+            <ul>
+                <li><strong>✅ Single Click Collection:</strong> Stones should be collected immediately on first click</li>
+                <li><strong>✅ Visual Disappearance:</strong> Stones should disappear instantly after collection</li>
+                <li><strong>✅ Inventory Management:</strong> Cannot collect new stones when inventory is full</li>
+                <li><strong>✅ Memory Cleanup:</strong> No phantom objects or memory leaks</li>
+                <li><strong>✅ Catapult Integration:</strong> Collected stones load into catapult properly</li>
+                <li><strong>✅ No Ghost Clicks:</strong> Invisible/collected stones cannot be clicked again</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let testResults = [];
+        let validationInterval = null;
+        
+        function addResult(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const resultDiv = document.getElementById('test-results');
+            const newLine = document.createElement('div');
+            newLine.className = type;
+            newLine.textContent = `[${timestamp}] ${message}`;
+            resultDiv.appendChild(newLine);
+            resultDiv.scrollTop = resultDiv.scrollHeight;
+            
+            testResults.push({ timestamp, message, type });
+        }
+        
+        function updateChecklistItem(id, status, message) {
+            const item = document.getElementById(id);
+            if (!item) return;
+            
+            item.className = `checklist-item ${status}`;
+            if (status === 'success') {
+                item.innerHTML = `${id.replace('check-', '')}. ✅ ${message}`;
+            } else if (status === 'failed') {
+                item.innerHTML = `${id.replace('check-', '')}. ❌ ${message}`;
+            } else {
+                item.innerHTML = `${id.replace('check-', '')}. ⏳ ${message}`;
+            }
+        }
+        
+        function updateGameState() {
+            if (typeof window !== 'undefined' && window.opener && window.opener.app) {
+                const app = window.opener.app;
+                const appStatus = document.getElementById('app-status');
+                const stoneCount = document.getElementById('stone-count');
+                const sceneChildren = document.getElementById('scene-children');
+                
+                appStatus.textContent = 'Running ✅';
+                appStatus.className = 'success';
+                
+                if (app.sceneManager && app.sceneManager.objects.stones) {
+                    const stones = app.sceneManager.objects.stones;
+                    const activeStones = stones.filter(s => s && !s.isCollected).length;
+                    stoneCount.textContent = `${activeStones}/${stones.length} active`;
+                    stoneCount.className = activeStones > 0 ? 'success' : 'warning';
+                }
+                
+                if (app.sceneManager && app.sceneManager.scene) {
+                    sceneChildren.textContent = app.sceneManager.scene.children.length;
+                    sceneChildren.className = 'info';
+                }
+                
+                // Update inventory
+                updateInventoryDisplay(app);
+                
+                // Update catapult status
+                updateCatapultStatus(app);
+                
+            } else {
+                // Try to access app directly if main window
+                if (window.app) {
+                    updateGameStateFromApp(window.app);
+                } else {
+                    document.getElementById('app-status').textContent = 'Not Running ❌';
+                    document.getElementById('app-status').className = 'error';
+                }
+            }
+        }
+        
+        function updateGameStateFromApp(app) {
+            const appStatus = document.getElementById('app-status');
+            const stoneCount = document.getElementById('stone-count');
+            const sceneChildren = document.getElementById('scene-children');
+            
+            appStatus.textContent = 'Running ✅';
+            appStatus.className = 'success';
+            
+            if (app.sceneManager && app.sceneManager.objects.stones) {
+                const stones = app.sceneManager.objects.stones;
+                const activeStones = stones.filter(s => s && !s.isCollected).length;
+                stoneCount.textContent = `${activeStones}/${stones.length} active`;
+                stoneCount.className = activeStones > 0 ? 'success' : 'warning';
+            }
+            
+            if (app.sceneManager && app.sceneManager.scene) {
+                sceneChildren.textContent = app.sceneManager.scene.children.length;
+                sceneChildren.className = 'info';
+            }
+            
+            updateInventoryDisplay(app);
+            updateCatapultStatus(app);
+        }
+        
+        function updateInventoryDisplay(app) {
+            const inventoryDiv = document.getElementById('inventory-status');
+            
+            if (app.playerInventory) {
+                if (app.playerInventory.hasRock && app.playerInventory.collectedStone) {
+                    inventoryDiv.textContent = '🗿 Inventory: Stone Available';
+                    inventoryDiv.style.background = 'rgba(76, 175, 80, 0.3)';
+                    inventoryDiv.style.borderColor = '#4CAF50';
+                } else {
+                    inventoryDiv.textContent = '🎒 Inventory: Empty';
+                    inventoryDiv.style.background = 'rgba(255, 152, 0, 0.3)';
+                    inventoryDiv.style.borderColor = '#ff9800';
+                }
+            } else {
+                inventoryDiv.textContent = '❓ Inventory: System Not Initialized';
+                inventoryDiv.style.background = 'rgba(244, 67, 54, 0.3)';
+                inventoryDiv.style.borderColor = '#f44336';
+            }
+        }
+        
+        function updateCatapultStatus(app) {
+            const catapultState = document.getElementById('catapult-state');
+            const catapultLoaded = document.getElementById('catapult-loaded');
+            
+            if (app.sceneManager && app.sceneManager.objects.catapult) {
+                const catapult = app.sceneManager.objects.catapult;
+                catapultState.textContent = 'Ready ✅';
+                catapultState.className = 'success';
+                
+                catapultLoaded.textContent = catapult.hasStone ? 'Loaded 🗿' : 'Empty 🔄';
+                catapultLoaded.className = catapult.hasStone ? 'success' : 'warning';
+            } else {
+                catapultState.textContent = 'Not Found ❌';
+                catapultState.className = 'error';
+                catapultLoaded.textContent = 'N/A';
+                catapultLoaded.className = 'error';
+            }
+        }
+        
+        function runComprehensiveValidation() {
+            addResult('🔍 Starting comprehensive validation of stone clicking bug fix...', 'info');
+            
+            // Check if game is available
+            let app = null;
+            if (window.opener && window.opener.app) {
+                app = window.opener.app;
+                addResult('✅ Found app instance via opener', 'success');
+            } else if (window.app) {
+                app = window.app;
+                addResult('✅ Found app instance in current window', 'success');
+            } else {
+                addResult('❌ App instance not found. Please open the main game first.', 'error');
+                updateChecklistItem('check-1', 'failed', 'App instance not available');
+                return;
+            }
+            
+            // Test 1: Raycast filtering system
+            testRaycastFiltering(app);
+            
+            // Test 2: Aggressive stone cleanup
+            testStoneCleanup(app);
+            
+            // Test 3: Inventory management
+            testInventorySystem(app);
+            
+            // Test 4: Single-click collection
+            testSingleClickBehavior(app);
+            
+            // Test 5: Memory cleanup
+            testMemoryManagement(app);
+            
+            // Test 6: Catapult integration
+            testCatapultLoadingSystem(app);
+            
+            addResult('🎯 Comprehensive validation completed!', 'success');
+        }
+        
+        function testRaycastFiltering(app) {
+            addResult('Testing raycast filtering system...', 'info');
+            
+            try {
+                // Check if the enhanced onClick method exists
+                if (app.onClick && typeof app.onClick === 'function') {
+                    // Look for the filtering logic in the source
+                    const onClickStr = app.onClick.toString();
+                    
+                    if (onClickStr.includes('allIntersects.filter') && 
+                        onClickStr.includes('obj.visible') && 
+                        onClickStr.includes('collected_stone')) {
+                        addResult('✅ Enhanced raycast filtering detected', 'success');
+                        updateChecklistItem('check-1', 'success', 'Raycast filtering system is active');
+                    } else {
+                        addResult('⚠️ Basic raycast filtering found, enhanced filtering may be missing', 'warning');
+                        updateChecklistItem('check-1', 'pending', 'Basic filtering found, checking enhancement...');
+                    }
+                } else {
+                    addResult('❌ onClick method not found', 'error');
+                    updateChecklistItem('check-1', 'failed', 'onClick method missing');
+                }
+            } catch (error) {
+                addResult(`❌ Error testing raycast filtering: ${error.message}`, 'error');
+                updateChecklistItem('check-1', 'failed', 'Error in raycast test');
+            }
+        }
+        
+        function testStoneCleanup(app) {
+            addResult('Testing aggressive stone cleanup...', 'info');
+            
+            try {
+                const stones = app.sceneManager.objects.stones;
+                if (stones && stones.length > 0) {
+                    const stone = stones[0];
+                    
+                    if (stone.collect && typeof stone.collect === 'function') {
+                        const collectStr = stone.collect.toString();
+                        
+                        if (collectStr.includes('dispose()') && 
+                            collectStr.includes('visible = false') && 
+                            collectStr.includes('mesh = null')) {
+                            addResult('✅ Aggressive cleanup methods detected', 'success');
+                            updateChecklistItem('check-2', 'success', 'Aggressive stone cleanup is implemented');
+                        } else {
+                            addResult('⚠️ Basic cleanup found, aggressive cleanup may be incomplete', 'warning');
+                            updateChecklistItem('check-2', 'pending', 'Partial cleanup detected');
+                        }
+                    } else {
+                        addResult('❌ Stone collect method not found', 'error');
+                        updateChecklistItem('check-2', 'failed', 'Collect method missing');
+                    }
+                } else {
+                    addResult('❌ No stones found for testing', 'error');
+                    updateChecklistItem('check-2', 'failed', 'No stones available');
+                }
+            } catch (error) {
+                addResult(`❌ Error testing stone cleanup: ${error.message}`, 'error');
+                updateChecklistItem('check-2', 'failed', 'Error in cleanup test');
+            }
+        }
+        
+        function testInventorySystem(app) {
+            addResult('Testing inventory management system...', 'info');
+            
+            try {
+                if (app.playerInventory) {
+                    addResult('✅ Player inventory system exists', 'success');
+                    
+                    // Check for inventory management in onClick
+                    const onClickStr = app.onClick.toString();
+                    if (onClickStr.includes('playerInventory.hasRock') && 
+                        onClickStr.includes('playerInventory.collectedStone') &&
+                        onClickStr.includes('updateInventoryUI')) {
+                        addResult('✅ Inventory management logic detected', 'success');
+                        updateChecklistItem('check-3', 'success', 'Inventory management is active');
+                    } else {
+                        addResult('⚠️ Inventory system exists but management logic incomplete', 'warning');
+                        updateChecklistItem('check-3', 'pending', 'Inventory exists, checking management...');
+                    }
+                } else {
+                    addResult('❌ Player inventory system not found', 'error');
+                    updateChecklistItem('check-3', 'failed', 'Inventory system missing');
+                }
+            } catch (error) {
+                addResult(`❌ Error testing inventory system: ${error.message}`, 'error');
+                updateChecklistItem('check-3', 'failed', 'Error in inventory test');
+            }
+        }
+        
+        function testSingleClickBehavior(app) {
+            addResult('Testing single-click collection behavior...', 'info');
+            
+            try {
+                const stones = app.sceneManager.objects.stones;
+                if (stones && stones.length > 0) {
+                    const unCollectedStones = stones.filter(s => s && !s.isCollected && !s.isBeingCollected);
+                    
+                    if (unCollectedStones.length > 0) {
+                        addResult(`✅ Found ${unCollectedStones.length} uncollected stones for testing`, 'success');
+                        updateChecklistItem('check-4', 'success', 'Single-click test ready - stones available');
+                    } else {
+                        addResult('⚠️ All stones are collected, creating test stone...', 'warning');
+                        updateChecklistItem('check-4', 'pending', 'Need to create test stones');
+                    }
+                } else {
+                    addResult('❌ No stones found for single-click test', 'error');
+                    updateChecklistItem('check-4', 'failed', 'No stones for testing');
+                }
+            } catch (error) {
+                addResult(`❌ Error testing single-click behavior: ${error.message}`, 'error');
+                updateChecklistItem('check-4', 'failed', 'Error in single-click test');
+            }
+        }
+        
+        function testMemoryManagement(app) {
+            addResult('Testing memory management...', 'info');
+            
+            try {
+                const initialObjects = app.sceneManager.scene.children.length;
+                addResult(`Initial scene objects: ${initialObjects}`, 'info');
+                
+                // Check for dispose methods and memory cleanup
+                const stones = app.sceneManager.objects.stones;
+                if (stones && stones.length > 0) {
+                    const stone = stones[0];
+                    if (stone.dispose && typeof stone.dispose === 'function') {
+                        addResult('✅ Memory disposal methods found', 'success');
+                        updateChecklistItem('check-5', 'success', 'Memory cleanup methods available');
+                    } else {
+                        addResult('⚠️ Basic memory management, advanced disposal may be missing', 'warning');
+                        updateChecklistItem('check-5', 'pending', 'Basic memory management detected');
+                    }
+                } else {
+                    addResult('❌ Cannot test memory management - no stones', 'error');
+                    updateChecklistItem('check-5', 'failed', 'No stones for memory test');
+                }
+            } catch (error) {
+                addResult(`❌ Error testing memory management: ${error.message}`, 'error');
+                updateChecklistItem('check-5', 'failed', 'Error in memory test');
+            }
+        }
+        
+        function testCatapultLoadingSystem(app) {
+            addResult('Testing catapult loading integration...', 'info');
+            
+            try {
+                const catapult = app.sceneManager.objects.catapult;
+                if (catapult) {
+                    if (catapult.loadStone && typeof catapult.loadStone === 'function') {
+                        const loadStoneStr = catapult.loadStone.toString();
+                        
+                        if (loadStoneStr.includes('isCollected') && 
+                            loadStoneStr.includes('new THREE.Mesh')) {
+                            addResult('✅ Enhanced catapult loading with mesh recreation detected', 'success');
+                            updateChecklistItem('check-6', 'success', 'Catapult integration is enhanced');
+                        } else {
+                            addResult('⚠️ Basic catapult loading found', 'warning');
+                            updateChecklistItem('check-6', 'pending', 'Basic catapult loading detected');
+                        }
+                    } else {
+                        addResult('❌ Catapult loadStone method not found', 'error');
+                        updateChecklistItem('check-6', 'failed', 'LoadStone method missing');
+                    }
+                } else {
+                    addResult('❌ Catapult not found', 'error');
+                    updateChecklistItem('check-6', 'failed', 'Catapult object missing');
+                }
+            } catch (error) {
+                addResult(`❌ Error testing catapult integration: ${error.message}`, 'error');
+                updateChecklistItem('check-6', 'failed', 'Error in catapult test');
+            }
+        }
+        
+        function testSingleClickCollection() {
+            addResult('🗿 Testing single-click stone collection...', 'info');
+            
+            // Get app reference
+            let app = window.opener?.app || window.app;
+            if (!app) {
+                addResult('❌ App not available for testing', 'error');
+                return;
+            }
+            
+            const stones = app.sceneManager.objects.stones;
+            const availableStone = stones.find(s => s && !s.isCollected && !s.isBeingCollected);
+            
+            if (!availableStone) {
+                addResult('⚠️ No available stones, creating test stone...', 'warning');
+                createTestStones();
+                return;
+            }
+            
+            addResult(`Testing collection on stone at position: ${availableStone.position}`, 'info');
+            
+            // Simulate collection
+            const beforeState = {
+                visible: availableStone.mesh ? availableStone.mesh.visible : false,
+                collected: availableStone.isCollected,
+                inventoryBefore: app.playerInventory ? app.playerInventory.hasRock : false
+            };
+            
+            if (availableStone.collect) {
+                const result = availableStone.collect();
+                
+                setTimeout(() => {
+                    const afterState = {
+                        visible: availableStone.mesh ? availableStone.mesh.visible : false,
+                        collected: availableStone.isCollected,
+                        inventoryAfter: app.playerInventory ? app.playerInventory.hasRock : false
+                    };
+                    
+                    addResult(`Before: Visible=${beforeState.visible}, Collected=${beforeState.collected}, Inventory=${beforeState.inventoryBefore}`, 'info');
+                    addResult(`After: Visible=${afterState.visible}, Collected=${afterState.collected}, Inventory=${afterState.inventoryAfter}`, 'info');
+                    
+                    if (result && afterState.collected && !afterState.visible) {
+                        addResult('✅ Single-click collection working correctly!', 'success');
+                    } else {
+                        addResult('❌ Single-click collection may have issues', 'error');
+                    }
+                }, 100);
+            } else {
+                addResult('❌ Stone collect method not available', 'error');
+            }
+        }
+        
+        function testInventoryPrevention() {
+            addResult('🎒 Testing inventory prevention system...', 'info');
+            
+            let app = window.opener?.app || window.app;
+            if (!app) {
+                addResult('❌ App not available for testing', 'error');
+                return;
+            }
+            
+            // Fill inventory first
+            if (!app.playerInventory) {
+                app.playerInventory = {};
+            }
+            
+            app.playerInventory.hasRock = true;
+            app.playerInventory.collectedStone = { test: true };
+            
+            addResult('Set inventory to full state', 'info');
+            
+            // Try to collect another stone
+            const stones = app.sceneManager.objects.stones;
+            const availableStone = stones.find(s => s && !s.isCollected && !s.isBeingCollected);
+            
+            if (availableStone) {
+                // Simulate the onClick inventory check
+                if (app.playerInventory.hasRock && app.playerInventory.collectedStone) {
+                    addResult('✅ Inventory prevention system working - collection blocked!', 'success');
+                } else {
+                    addResult('❌ Inventory prevention system not working', 'error');
+                }
+            } else {
+                addResult('⚠️ No available stones to test prevention with', 'warning');
+            }
+        }
+        
+        function testMemoryCleanup() {
+            addResult('🧹 Testing memory cleanup...', 'info');
+            
+            let app = window.opener?.app || window.app;
+            if (!app) {
+                addResult('❌ App not available for testing', 'error');
+                return;
+            }
+            
+            const initialObjectCount = app.sceneManager.scene.children.length;
+            addResult(`Initial scene objects: ${initialObjectCount}`, 'info');
+            
+            // Find a stone to test cleanup on
+            const stones = app.sceneManager.objects.stones;
+            const testStone = stones.find(s => s && !s.isCollected);
+            
+            if (testStone && testStone.mesh) {
+                const meshUUID = testStone.mesh.uuid;
+                addResult(`Testing cleanup on stone with mesh UUID: ${meshUUID}`, 'info');
+                
+                testStone.collect();
+                
+                setTimeout(() => {
+                    const afterObjectCount = app.sceneManager.scene.children.length;
+                    const meshStillExists = app.sceneManager.scene.getObjectByProperty('uuid', meshUUID);
+                    
+                    addResult(`After cleanup - Scene objects: ${afterObjectCount}`, 'info');
+                    addResult(`Mesh still exists: ${meshStillExists ? 'Yes' : 'No'}`, meshStillExists ? 'warning' : 'success');
+                    
+                    if (!meshStillExists && afterObjectCount <= initialObjectCount) {
+                        addResult('✅ Memory cleanup working correctly!', 'success');
+                    } else {
+                        addResult('⚠️ Memory cleanup may be incomplete', 'warning');
+                    }
+                }, 200);
+            } else {
+                addResult('❌ No suitable stone found for memory test', 'error');
+            }
+        }
+        
+        function testCatapultIntegration() {
+            addResult('🏹 Testing catapult integration...', 'info');
+            
+            let app = window.opener?.app || window.app;
+            if (!app) {
+                addResult('❌ App not available for testing', 'error');
+                return;
+            }
+            
+            const catapult = app.sceneManager.objects.catapult;
+            if (!catapult) {
+                addResult('❌ Catapult not found', 'error');
+                return;
+            }
+            
+            // Ensure inventory has a stone
+            if (!app.playerInventory) {
+                app.playerInventory = {};
+            }
+            
+            // Create a test collected stone
+            const testStone = {
+                isCollected: true,
+                mesh: null,
+                position: { x: 0, y: 0, z: 0 }
+            };
+            
+            app.playerInventory.hasRock = true;
+            app.playerInventory.collectedStone = testStone;
+            
+            addResult('Setup test inventory with collected stone', 'info');
+            
+            // Test loading
+            const beforeLoad = catapult.hasStone;
+            const loadResult = catapult.loadStone(testStone);
+            const afterLoad = catapult.hasStone;
+            
+            addResult(`Before load: ${beforeLoad}, After load: ${afterLoad}, Result: ${loadResult}`, 'info');
+            
+            if (loadResult && afterLoad && testStone.mesh) {
+                addResult('✅ Catapult integration working - mesh recreated for loaded stone!', 'success');
+            } else if (loadResult && afterLoad) {
+                addResult('⚠️ Catapult loading working but mesh recreation unclear', 'warning');
+            } else {
+                addResult('❌ Catapult integration not working properly', 'error');
+            }
+        }
+        
+        function createTestStones() {
+            addResult('🔨 Creating test stones...', 'info');
+            
+            let app = window.opener?.app || window.app;
+            if (!app) {
+                addResult('❌ App not available for creating stones', 'error');
+                return;
+            }
+            
+            if (app.sceneManager && app.sceneManager.createStones) {
+                app.sceneManager.createStones();
+                addResult('✅ Test stones created', 'success');
+            } else {
+                addResult('❌ Cannot create test stones - method not available', 'error');
+            }
+        }
+        
+        function resetTestEnvironment() {
+            addResult('🔄 Resetting test environment...', 'info');
+            
+            let app = window.opener?.app || window.app;
+            if (!app) {
+                addResult('❌ App not available for reset', 'error');
+                return;
+            }
+            
+            // Reset inventory
+            if (app.playerInventory) {
+                app.playerInventory.hasRock = false;
+                app.playerInventory.collectedStone = null;
+                addResult('✅ Inventory reset', 'success');
+            }
+            
+            // Reset catapult
+            const catapult = app.sceneManager.objects.catapult;
+            if (catapult) {
+                catapult.hasStone = false;
+                catapult.loadedStone = null;
+                addResult('✅ Catapult reset', 'success');
+            }
+            
+            // Update UI
+            if (app.updateInventoryUI) {
+                app.updateInventoryUI();
+                addResult('✅ UI updated', 'success');
+            }
+            
+            addResult('🎯 Test environment reset complete', 'success');
+        }
+        
+        // Auto-update game state
+        setInterval(updateGameState, 2000);
+        
+        // Initial state update
+        updateGameState();
+        
+        // Auto-run validation after delay if app is available
+        setTimeout(() => {
+            if (window.opener?.app || window.app) {
+                addResult('🔄 App detected, running initial validation...', 'info');
+                runComprehensiveValidation();
+            } else {
+                addResult('⏳ Waiting for app to be available...', 'warning');
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

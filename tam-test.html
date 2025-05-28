@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Tam Çalışma Testi - Taş ve Mancınık</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        
+        .control-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #4CAF50;
+            z-index: 1000;
+            max-width: 280px;
+        }
+        
+        .control-panel h3 {
+            margin: 0 0 10px 0;
+            color: #4CAF50;
+            text-align: center;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        
+        .instructions {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 100, 200, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #2196F3;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        
+        .instructions h3 {
+            margin: 0 0 10px 0;
+            color: #2196F3;
+        }
+        
+        .step {
+            margin: 5px 0;
+            padding: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            border-left: 3px solid #2196F3;
+        }
+        
+        .logs {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            height: 120px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #FF9800;
+            border-radius: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        
+        .log-success { background: rgba(76, 175, 80, 0.2); color: #4CAF50; }
+        .log-error { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+        .log-warning { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+        .log-info { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
+        
+        button {
+            background: #FF9800;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 11px;
+        }
+        
+        button:hover {
+            background: #F57C00;
+        }
+    </style>
+</head>
+<body>
+    <div class="instructions">
+        <h3>🎮 Oyun Talimatları</h3>
+        <div class="step">1️⃣ Oyunun yüklenmesini bekleyin</div>
+        <div class="step">2️⃣ Kırmızı taşlara TEK KEZ tıklayın</div>
+        <div class="step">3️⃣ Taş toplanınca mancınığa tıklayın</div>
+        <div class="step">4️⃣ Taş yüklenince tekrar mancınığa tıklayın</div>
+        <div class="step">5️⃣ Taş fırlatılacak!</div>
+        <button onclick="toggleInstructions()">Gizle</button>
+    </div>
+    
+    <div class="control-panel">
+        <h3>📊 Oyun Durumu</h3>
+        
+        <div class="status-item">
+            <span>Toplanan Taş:</span>
+            <span id="stoneCount">0</span>
+        </div>
+        
+        <div class="status-item">
+            <span>Envanterde Taş:</span>
+            <span id="inventoryStatus">❌</span>
+        </div>
+        
+        <div class="status-item">
+            <span>Mancınık Durumu:</span>
+            <span id="catapultStatus">🔴 Boş</span>
+        </div>
+        
+        <div class="status-item">
+            <span>Fırlatılan Taş:</span>
+            <span id="launchedCount">0</span>
+        </div>
+        
+        <hr>
+        <button onclick="updateStatus()">🔄 Güncelle</button>
+        <button onclick="clearLogs()">🗑️ Log Temizle</button>
+        <button onclick="togglePanel()">👁️ Gizle</button>
+    </div>
+    
+    <div class="logs" id="logContainer">
+        <div class="log-entry log-info">🏰 Oyun yükleniyor...</div>
+    </div>
+
+    <!-- Include Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Include dat.GUI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+    
+    <!-- Include game scripts -->
+    <script src="js/scene.js"></script>
+    <script src="js/lights.js"></script>
+    <script src="js/objects.js"></script>
+    <script src="js/main.js"></script>
+    
+    <script>
+        let collectedStones = 0;
+        let launchedStones = 0;
+        let logs = [];
+        let panelsVisible = { instructions: true, control: true };
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.push({ message, type, timestamp });
+            
+            // Son 20 log'u göster
+            const recent = logs.slice(-20);
+            const container = document.getElementById('logContainer');
+            
+            container.innerHTML = recent.map(log => 
+                `<div class="log-entry log-${log.type}">
+                    [${log.timestamp}] ${log.message}
+                </div>`
+            ).join('');
+            
+            // Auto scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function updateStatus() {
+            if (!window.app) {
+                addLog('❌ Oyun henüz yüklenmedi', 'error');
+                return;
+            }
+            
+            // Inventory check
+            const hasInventoryStone = window.app.playerInventory?.hasRock;
+            document.getElementById('inventoryStatus').textContent = hasInventoryStone ? '✅' : '❌';
+            
+            // Catapult check
+            const catapult = window.app.sceneManager?.objects?.catapult;
+            let catapultStatus = '❓ Bilinmiyor';
+            if (catapult) {
+                if (catapult.hasStone) {
+                    catapultStatus = '🔴 Dolu';
+                } else {
+                    catapultStatus = '⚪ Boş';
+                }
+            }
+            document.getElementById('catapultStatus').textContent = catapultStatus;
+            
+            // Stone count
+            const stones = window.app.sceneManager?.objects?.stones;
+            if (stones) {
+                const collected = stones.filter(s => s && s.isCollected).length;
+                collectedStones = collected;
+                document.getElementById('stoneCount').textContent = collected;
+            }
+            
+            document.getElementById('launchedCount').textContent = launchedStones;
+            
+            addLog(`📊 Durum güncellendi: ${collectedStones} taş, envanter: ${hasInventoryStone ? 'dolu' : 'boş'}`, 'info');
+        }
+        
+        function clearLogs() {
+            logs = [];
+            document.getElementById('logContainer').innerHTML = 
+                '<div class="log-entry log-info">🗑️ Loglar temizlendi</div>';
+        }
+        
+        function toggleInstructions() {
+            const panel = document.querySelector('.instructions');
+            panelsVisible.instructions = !panelsVisible.instructions;
+            panel.style.display = panelsVisible.instructions ? 'block' : 'none';
+        }
+        
+        function togglePanel() {
+            const panel = document.querySelector('.control-panel');
+            panelsVisible.control = !panelsVisible.control;
+            panel.style.display = panelsVisible.control ? 'block' : 'none';
+        }
+        
+        // Console override - tüm önemli mesajları yakalayalım
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.join(' ');
+            
+            if (message.includes('✅ TAŞ BAŞARIYLA TOPLANDI')) {
+                addLog('✅ Taş başarıyla toplandı!', 'success');
+                setTimeout(updateStatus, 100);
+            } else if (message.includes('⚠️ Bu taş zaten toplandı')) {
+                addLog('⚠️ Bu taş zaten toplandı - çoklu tıklama engellendi', 'warning');
+            } else if (message.includes('🏹 Mancınık tıklandı')) {
+                addLog('🏹 Mancınık tıklandı', 'info');
+            } else if (message.includes('📦 Taş mancınığa yükleniyor')) {
+                addLog('📦 Taş mancınığa yükleniyor...', 'info');
+            } else if (message.includes('🚀 Mancınıktan taş fırlatılıyor')) {
+                addLog('🚀 Taş fırlatılıyor!', 'success');
+                launchedStones++;
+                setTimeout(updateStatus, 100);
+            } else if (message.includes('Stone found and collecting')) {
+                addLog('🔍 Taş bulundu, toplama başlatılıyor...', 'info');
+            } else if (message.includes('=== STONE COLLECTION BAŞLADI')) {
+                addLog('🔄 Taş collection işlemi başladı', 'info');
+            } else if (message.includes('=== STONE COLLECTION TAMAMLANDI')) {
+                addLog('✅ Taş collection tamamlandı', 'success');
+            }
+        };
+        
+        // Console error override
+        const originalError = console.error;
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            const message = args.join(' ');
+            addLog(`❌ Error: ${message}`, 'error');
+        };
+        
+        // Status güncelleme döngüsü
+        setInterval(updateStatus, 2000);
+        
+        // Sayfa yüklendiğinde
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addLog('🏰 Oyun yüklendi! Taşlara tıklayın.', 'success');
+                updateStatus();
+            }, 3000);
+        });
+        
+        // İlk log
+        addLog('🚀 Tam işlevsellik testi başlatıldı', 'info');
+    </script>
+</body>
+</html>

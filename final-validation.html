@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Stone Bug Fix - Final Validation</title>
+    <style>
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .validation-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            border: 3px solid #27ae60;
+            z-index: 1000;
+            max-width: 500px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+        }
+        
+        .validation-container h1 {
+            margin: 0 0 20px 0;
+            color: #27ae60;
+            text-align: center;
+            font-size: 24px;
+        }
+        
+        .bug-description {
+            background: rgba(231, 76, 60, 0.2);
+            border-left: 4px solid #e74c3c;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .fix-description {
+            background: rgba(39, 174, 96, 0.2);
+            border-left: 4px solid #27ae60;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(52, 73, 94, 0.3);
+            border-radius: 8px;
+            border: 1px solid #34495e;
+        }
+        
+        .test-section h3 {
+            margin: 0 0 15px 0;
+            color: #3498db;
+        }
+        
+        .test-button {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s ease;
+            width: calc(100% - 10px);
+            font-weight: 600;
+        }
+        
+        .test-button:hover {
+            background: linear-gradient(45deg, #2980b9, #3498db);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .test-button.primary {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+        }
+        
+        .test-button.primary:hover {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
+        }
+        
+        .test-button.secondary {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+        
+        .test-button.secondary:hover {
+            background: linear-gradient(45deg, #e67e22, #f39c12);
+            box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4);
+        }
+        
+        .console-note {
+            font-size: 13px;
+            color: #f1c40f;
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(241, 196, 15, 0.1);
+            border-radius: 5px;
+        }
+        
+        .workflow-steps {
+            font-size: 13px;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(149, 165, 166, 0.1);
+            border-radius: 5px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-pending { background-color: #f39c12; }
+        .status-success { background-color: #27ae60; }
+        .status-error { background-color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="validation-container">
+        <h1>🎯 Stone Bug Fix Validation</h1>
+        
+        <div class="bug-description">
+            <strong>🐛 Bug Fixed:</strong> Stones required multiple clicks (4+ times) because `isBeingCollected = true` was set prematurely in main.js before calling `stone.collect()`, causing the collect method to exit early.
+        </div>
+        
+        <div class="fix-description">
+            <strong>✅ Solution Applied:</strong> Removed premature lock from main.js onClick handler. Now `stone.collect()` handles its own locking internally, allowing single-click collection.
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Basic Fix Validation</h3>
+            <div class="workflow-steps">
+                Tests the core bug fix: single-click stone collection
+            </div>
+            <button class="test-button" onclick="testSingleClickCollection()">
+                🎯 Test Single Click Collection
+            </button>
+            <button class="test-button" onclick="testClickHandler()">
+                🖱️ Test Click Handler Logic
+            </button>
+            <button class="test-button primary" onclick="runFullValidation()">
+                🔬 Run Basic Validation Suite
+            </button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🎮 End-to-End Workflow</h3>
+            <div class="workflow-steps">
+                Tests complete gameplay: collect → load → fire
+            </div>
+            <button class="test-button" onclick="testCompleteStoneWorkflow()">
+                🔄 Test Complete Workflow
+            </button>
+            <button class="test-button" onclick="testStoneClickToFire()">
+                🎮 Test Click-to-Fire
+            </button>
+            <button class="test-button primary" onclick="runEndToEndValidation()">
+                🚀 Run End-to-End Suite
+            </button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🛠️ Emergency Tools</h3>
+            <div class="workflow-steps">
+                Create test stones if needed for validation
+            </div>
+            <button class="test-button secondary" onclick="createCriticalEmergencyStones()">
+                🚨 Create Test Stones
+            </button>
+            <button class="test-button secondary" onclick="verifyStoneSystem()">
+                🔍 Verify Stone System
+            </button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 Expected Results</h3>
+            <div style="font-size: 13px; line-height: 1.6;">
+                <div><span class="status-indicator status-success"></span>All basic validation tests pass</div>
+                <div><span class="status-indicator status-success"></span>Single-click stone collection works</div>
+                <div><span class="status-indicator status-success"></span>Collected stones load into catapult</div>
+                <div><span class="status-indicator status-success"></span>Loaded stones can be fired</div>
+                <div><span class="status-indicator status-success"></span>Complete workflow functions smoothly</div>
+            </div>
+        </div>
+        
+        <div class="console-note">
+            📊 Check browser console (F12) for detailed test results and validation logs
+        </div>
+    </div>
+
+    <!-- Include Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Include game files -->
+    <script type="module" src="js/scene.js"></script>
+    <script type="module" src="js/objects.js"></script>
+    <script type="module" src="js/main.js"></script>
+    
+    <!-- Include validation scripts -->
+    <script src="test-stone-fix.js"></script>
+    <script src="test-end-to-end.js"></script>
+    <script src="verify-stones.js"></script>
+    <script src="critical-emergency.js"></script>
+    
+    <script>
+        // Auto-initialize game and run validations
+        setTimeout(() => {
+            console.log("🎮 Auto-starting game for final validation...");
+            
+            import('./js/main.js').then(module => {
+                console.log("✅ Main module loaded for final validation");
+                
+                // Show status in title
+                document.title = "🎯 Stone Bug Fix - Validation Running...";
+                
+                setTimeout(() => {
+                    document.title = "🎯 Stone Bug Fix - Validation Complete";
+                }, 10000);
+                
+            }).catch(err => {
+                console.error("❌ Failed to load main module:", err);
+                document.title = "🎯 Stone Bug Fix - Load Error";
+            });
+        }, 1000);
+        
+        // Auto-run basic validation after app loads
+        setTimeout(() => {
+            if (window.runFullValidation) {
+                console.log("\n🤖 AUTO-RUNNING BASIC VALIDATION...");
+                runFullValidation();
+            }
+        }, 5000);
+        
+        // Auto-run end-to-end validation after basic validation
+        setTimeout(() => {
+            if (window.runEndToEndValidation) {
+                console.log("\n🤖 AUTO-RUNNING END-TO-END VALIDATION...");
+                runEndToEndValidation();
+            }
+        }, 8000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Stone Fix Validation Test</title>
+    <style>
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        
+        .test-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 25px;
+            border-radius: 15px;
+            border: 3px solid #4CAF50;
+            z-index: 1000;
+            max-width: 450px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .test-container h1 {
+            margin: 0 0 20px 0;
+            color: #4CAF50;
+            text-align: center;
+        }
+        
+        .test-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: background 0.3s;
+            width: 100%;
+        }
+        
+        .test-button:hover {
+            background: #45a049;
+        }
+        
+        .info {
+            background: rgba(33, 150, 243, 0.2);
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .success {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        
+        .console-note {
+            font-size: 14px;
+            color: #ffeb3b;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Stone Fix Validation</h1>
+        
+        <div class="info">
+            <strong>🎯 Purpose:</strong> Test that the stone clicking bug has been fixed.
+            <br><br>
+            <strong>🐛 Bug Description:</strong> Stones required multiple clicks (4+ times) to collect because `isBeingCollected` was set prematurely in main.js before calling `stone.collect()`.
+            <br><br>
+            <strong>✅ Fix Applied:</strong> Removed premature lock, letting `collect()` method handle its own locking internally.
+        </div>
+        
+        <button class="test-button" onclick="testSingleClickCollection()">
+            🎯 Test Direct Collection
+        </button>
+        
+        <button class="test-button" onclick="testClickHandler()">
+            🖱️ Test Click Handler Logic
+        </button>
+        
+        <button class="test-button" onclick="runFullValidation()">
+            🔬 Run Full Validation Suite
+        </button>
+        
+        <button class="test-button" onclick="createCriticalEmergencyStones()">
+            🚨 Create Test Stones (if needed)
+        </button>
+        
+        <div class="success">
+            <strong>✅ Expected Result:</strong> All tests should pass, confirming stones can be collected on a single click.
+        </div>
+        
+        <div class="console-note">
+            📊 Check browser console (F12) for detailed test results
+        </div>
+    </div>
+
+    <!-- Include Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Include game files -->
+    <script type="module" src="js/scene.js"></script>
+    <script type="module" src="js/objects.js"></script>
+    <script type="module" src="js/main.js"></script>
+    
+    <!-- Include validation script -->
+    <script src="test-stone-fix.js"></script>
+    
+    <!-- Include emergency stone creation -->
+    <script src="critical-emergency.js"></script>
+    
+    <script>
+        // Auto-initialize game after a delay
+        setTimeout(() => {
+            console.log("🎮 Auto-starting game for validation testing...");
+            
+            import('./js/main.js').then(module => {
+                console.log("✅ Main module loaded");
+                
+                // The validation will run automatically after the game loads
+                console.log("⏳ Waiting for game initialization before running validation...");
+            }).catch(err => {
+                console.error("❌ Failed to load main module:", err);
+            });
+        }, 1000);
+    </script>
+</body>
+</html>

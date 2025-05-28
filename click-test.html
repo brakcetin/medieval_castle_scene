@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stone Click Test - Medieval Castle</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        #test-overlay {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #00ff00;
+            max-width: 350px;
+            z-index: 1000;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .test-btn {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 8px 12px;
+            margin: 3px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        
+        .test-btn:hover {
+            background: #66ff66;
+        }
+        
+        #click-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ff0000;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 999;
+        }
+        
+        #status-log {
+            margin-top: 10px;
+            padding: 8px;
+            background: #000;
+            border: 1px solid #333;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="score-panel">Puan: <span id="score">0</span></div>
+    <div id="controls-panel">
+        <button id="day-night-toggle">Gece/Gündüz</button>
+    </div>
+    <div id="time-control-panel">
+        <h4>Zaman Kontrolü</h4>
+        <label for="time-slider">Saat: <span id="time-display">12</span></label>
+        <input type="range" id="time-slider" min="0" max="24" step="0.5" value="12">
+        <p>Gece: 20-6, Gündüz: 6-20</p>
+    </div>
+
+    <div id="test-overlay">
+        <h3>🎯 Stone Click Tester</h3>
+        <button class="test-btn" onclick="runDiagnosis()">🔍 Diagnose</button>
+        <button class="test-btn" onclick="testCenterClick()">🎯 Test Center Click</button>
+        <button class="test-btn" onclick="createEmergencyStones()">🗿 Create Emergency Stones</button>
+        <button class="test-btn" onclick="clearLog()">🧹 Clear Log</button>
+        <br>
+        <button class="test-btn" onclick="toggleClickIndicator()">📍 Toggle Crosshair</button>
+        <button class="test-btn" onclick="analyzeScene()">📊 Analyze Scene</button>
+        
+        <div id="status-log">Ready for testing...</div>
+    </div>
+
+    <div id="click-indicator" style="display: none;"></div>
+
+    <div id="instructions">
+        <h3>Click Test Instructions:</h3>
+        <p><strong>W, A, S, D</strong> - Hareket</p>
+        <p><strong>Mouse Click</strong> - Test Stone Clicking</p>
+        <p><strong>🎯 Test Center Click</strong> - Simulate click at screen center</p>
+        <p><strong>🔍 Diagnose</strong> - Check stone status</p>
+        <p><strong>🗿 Create Emergency</strong> - Force create visible stones</p>
+    </div>
+    
+    <div id="loading">Yükleniyor...</div>
+    <canvas id="scene-canvas"></canvas>
+
+    <!-- Three.js ve İlgili Kütüphaneler -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "dat.gui": "https://unpkg.com/dat.gui@0.7.9/build/dat.gui.module.js"
+            }
+        }
+    </script>
+    
+    <!-- dat.GUI Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
+
+    <!-- Uygulama Kodları -->
+    <script type="module" src="js/main.js"></script>
+    <script type="module" src="stone-click-diagnosis.js"></script>
+    <script type="module" src="emergency-stones.js"></script>
+    <script type="module" src="critical-emergency.js"></script>
+
+    <script>
+        function log(message) {
+            const statusLog = document.getElementById('status-log');
+            const time = new Date().toLocaleTimeString();
+            statusLog.innerHTML += `[${time}] ${message}<br>`;
+            statusLog.scrollTop = statusLog.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('status-log').innerHTML = 'Log cleared...';
+        }
+
+        function runDiagnosis() {
+            log("🔍 Running stone diagnosis...");
+            if (window.diagnoseStonesClickability) {
+                window.diagnoseStonesClickability();
+                log("✅ Diagnosis complete - check console");
+            } else {
+                log("❌ Diagnosis function not available");
+            }
+        }
+
+        function testCenterClick() {
+            log("🎯 Testing center click...");
+            
+            if (!window.app || !window.app.onClick) {
+                log("❌ App or onClick method not available");
+                return;
+            }
+
+            // Simulate click in center of screen
+            const event = {
+                clientX: window.innerWidth / 2,
+                clientY: window.innerHeight / 2
+            };
+
+            log(`Simulating click at (${event.clientX}, ${event.clientY})`);
+            
+            try {
+                window.app.onClick(event);
+                log("✅ Click simulation sent");
+            } catch (error) {
+                log(`❌ Click simulation failed: ${error.message}`);
+            }
+        }
+
+        function createEmergencyStones() {
+            log("🗿 Creating emergency stones...");
+            
+            if (window.createCriticalEmergencyStones) {
+                window.createCriticalEmergencyStones();
+                log("✅ Emergency stones created");
+            } else if (window.createEmergencyStones) {
+                window.createEmergencyStones();
+                log("✅ Emergency stones created");
+            } else {
+                log("❌ Emergency stone creation not available");
+            }
+        }
+
+        function toggleClickIndicator() {
+            const indicator = document.getElementById('click-indicator');
+            if (indicator.style.display === 'none') {
+                indicator.style.display = 'block';
+                log("📍 Crosshair enabled");
+            } else {
+                indicator.style.display = 'none';
+                log("📍 Crosshair disabled");
+            }
+        }
+
+        function analyzeScene() {
+            log("📊 Analyzing scene...");
+            
+            if (!window.app) {
+                log("❌ App not available");
+                return;
+            }
+
+            const scene = window.app.sceneManager?.scene;
+            if (!scene) {
+                log("❌ Scene not available");
+                return;
+            }
+
+            log(`Scene children count: ${scene.children.length}`);
+            
+            const stones = window.app.sceneManager?.objects?.stones;
+            if (stones) {
+                log(`Stones array length: ${stones.length}`);
+                let visibleCount = 0;
+                let collectableCount = 0;
+                
+                stones.forEach((stone, index) => {
+                    if (stone && stone.mesh && stone.mesh.visible) {
+                        visibleCount++;
+                    }
+                    if (stone && !stone.isCollected) {
+                        collectableCount++;
+                    }
+                });
+                
+                log(`Visible stones: ${visibleCount}/${stones.length}`);
+                log(`Collectable stones: ${collectableCount}/${stones.length}`);
+            } else {
+                log("❌ Stones array not found");
+            }
+
+            // Camera info
+            const camera = window.app.camera;
+            if (camera) {
+                log(`Camera position: (${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})`);
+            }
+        }
+
+        // Auto-run diagnosis after app loads
+        setTimeout(() => {
+            log("🚀 Auto-running initial diagnosis...");
+            runDiagnosis();
+            analyzeScene();
+        }, 4000);
+
+        // Monitor click events
+        document.addEventListener('click', function(event) {
+            if (event.target.tagName !== 'BUTTON' && event.target.tagName !== 'INPUT') {
+                log(`🖱️ Native click detected at (${event.clientX}, ${event.clientY})`);
+            }
+        });
+
+        // Auto-log when page loads
+        window.addEventListener('load', function() {
+            log("🎯 Click test page loaded");
+        });
+    </script>
+</body>
+</html>

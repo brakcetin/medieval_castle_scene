@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Taş Tıklama - Tek Tık Testi</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        
+        .test-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #4CAF50;
+            z-index: 1000;
+            max-width: 350px;
+        }
+        
+        .test-panel h2 {
+            margin: 0 0 15px 0;
+            color: #4CAF50;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 4px solid;
+        }
+        
+        .success {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: #4CAF50;
+        }
+        
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            border-color: #f44336;
+        }
+        
+        .warning {
+            background: rgba(255, 152, 0, 0.2);
+            border-color: #ff9800;
+        }
+        
+        .info {
+            background: rgba(33, 150, 243, 0.2);
+            border-color: #2196f3;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        .counter {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 10px 0;
+        }
+        
+        .instruction {
+            background: rgba(33, 150, 243, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-panel">
+        <h2>🏰 Tek Tık Taş Testi</h2>
+        
+        <div class="instruction">
+            <strong>Test Talimatları:</strong><br>
+            1. Aşağıdaki oyunu yüklenmeyi bekleyin<br>
+            2. Taşların üzerine TEK KEZ tıklayın<br>
+            3. Taş hemen yok olmalı<br>
+            4. Konsola bakın (F12)
+        </div>
+        
+        <div class="counter" id="clickCounter">
+            Toplanan Taş: 0
+        </div>
+        
+        <div id="testStatus">
+            <div class="status info">🔄 Test sistemi hazırlanıyor...</div>
+        </div>
+        
+        <button onclick="analyzeStones()">🔍 Taşları Analiz Et</button>
+        <button onclick="testSingleClick()">🖱️ Tek Tık Testi</button>
+        <button onclick="clearStatus()">🗑️ Temizle</button>
+        <button onclick="togglePanel()">👁️ Gizle/Göster</button>
+    </div>
+
+    <!-- Include Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Include dat.GUI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+    
+    <!-- Include game scripts -->
+    <script src="js/scene.js"></script>
+    <script src="js/lights.js"></script>
+    <script src="js/objects.js"></script>
+    <script src="js/main.js"></script>
+    
+    <script>
+        let collectedStones = 0;
+        let statusMessages = [];
+        let panelVisible = true;
+        
+        function addStatus(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            statusMessages.push({ message, type, timestamp });
+            
+            // Son 5 mesajı göster
+            const recent = statusMessages.slice(-5);
+            const statusDiv = document.getElementById('testStatus');
+            
+            statusDiv.innerHTML = recent.map(msg => 
+                `<div class="status ${msg.type}">
+                    <small>${msg.timestamp}</small><br>
+                    ${msg.message}
+                </div>`
+            ).join('');
+        }
+        
+        function updateCounter() {
+            document.getElementById('clickCounter').textContent = `Toplanan Taş: ${collectedStones}`;
+        }
+        
+        function clearStatus() {
+            statusMessages = [];
+            document.getElementById('testStatus').innerHTML = 
+                '<div class="status info">🔄 Status temizlendi</div>';
+        }
+        
+        function togglePanel() {
+            const panel = document.querySelector('.test-panel');
+            panelVisible = !panelVisible;
+            panel.style.display = panelVisible ? 'block' : 'none';
+        }
+        
+        function analyzeStones() {
+            addStatus('🔍 Taşlar analiz ediliyor...', 'info');
+            
+            setTimeout(() => {
+                if (!window.app || !window.app.sceneManager) {
+                    addStatus('❌ Oyun henüz yüklenmedi', 'error');
+                    return;
+                }
+                
+                const stones = window.app.sceneManager.objects?.stones;
+                if (!stones || stones.length === 0) {
+                    addStatus('❌ Hiç taş bulunamadı', 'error');
+                    return;
+                }
+                
+                const availableStones = stones.filter(stone => 
+                    stone && !stone.isCollected && !stone.isBeingCollected && stone.mesh && stone.mesh.visible
+                );
+                
+                addStatus(`✅ ${stones.length} taş bulundu, ${availableStones.length} tanesi toplanabilir`, 'success');
+                
+                availableStones.forEach((stone, index) => {
+                    const pos = stone.mesh.position;
+                    addStatus(`Taş ${index + 1}: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`, 'info');
+                });
+                
+            }, 1000);
+        }
+        
+        function testSingleClick() {
+            addStatus('🖱️ Tek tık testi başlatılıyor...', 'info');
+            
+            setTimeout(() => {
+                if (!window.app || !window.app.sceneManager) {
+                    addStatus('❌ Oyun yüklenmedi', 'error');
+                    return;
+                }
+                
+                const stones = window.app.sceneManager.objects?.stones;
+                if (!stones || stones.length === 0) {
+                    addStatus('❌ Test için taş bulunamadı', 'error');
+                    return;
+                }
+                
+                const availableStones = stones.filter(stone => 
+                    stone && !stone.isCollected && !stone.isBeingCollected && stone.mesh && stone.mesh.visible
+                );
+                
+                if (availableStones.length === 0) {
+                    addStatus('⚠️ Toplanabilir taş yok', 'warning');
+                    return;
+                }
+                
+                const targetStone = availableStones[0];
+                addStatus(`🎯 İlk taşı test ediyoruz: ${targetStone.mesh.name}`, 'info');
+                
+                // Taşın pozisyonunu ekran koordinatlarına çevir
+                const vector = targetStone.mesh.position.clone();
+                vector.project(window.app.camera);
+                
+                const canvas = document.getElementById('scene-canvas');
+                if (!canvas) {
+                    addStatus('❌ Canvas bulunamadı', 'error');
+                    return;
+                }
+                
+                const x = (vector.x + 1) / 2 * canvas.width;
+                const y = (-vector.y + 1) / 2 * canvas.height;
+                
+                // Simüle click event oluştur
+                const clickEvent = new MouseEvent('click', {
+                    clientX: x,
+                    clientY: y,
+                    bubbles: true,
+                    cancelable: true
+                });
+                
+                addStatus(`🎯 Tık simüle ediliyor: (${x.toFixed(0)}, ${y.toFixed(0)})`, 'info');
+                
+                // Click event'i dispatch et
+                canvas.dispatchEvent(clickEvent);
+                
+                // Sonucu kontrol et
+                setTimeout(() => {
+                    if (targetStone.isCollected || targetStone.isBeingCollected) {
+                        addStatus('✅ TEK TIK BAŞARILI! Taş toplandı!', 'success');
+                        collectedStones++;
+                        updateCounter();
+                    } else {
+                        addStatus('❌ Tek tık başarısız - taş toplanmadı', 'error');
+                    }
+                }, 200);
+                
+            }, 1000);
+        }
+        
+        // Console override - önemli mesajları yakalayalım
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.join(' ');
+            
+            if (message.includes('✅ TAŞ BAŞARIYLA TOPLANDI')) {
+                collectedStones++;
+                updateCounter();
+                addStatus('✅ TAŞ TOPLANDI - tek tıklamada!', 'success');
+            } else if (message.includes('⚠️ Bu taş zaten toplandı')) {
+                addStatus('⚠️ Taş zaten toplandı - çoklu tıklama engellendi', 'warning');
+            } else if (message.includes('Stone found and collecting')) {
+                addStatus('🔄 Taş collection başlatıldı...', 'info');
+            }
+        };
+        
+        // Sayfa yüklendiğinde
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addStatus('🏰 Tek tık taş testi hazır!', 'success');
+                addStatus('💡 Taşlara tıklayın ve konsolu izleyin', 'info');
+            }, 3000);
+        });
+    </script>
+</body>
+</html>

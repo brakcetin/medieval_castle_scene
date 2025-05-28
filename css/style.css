@@ -32,6 +32,39 @@ body {
     z-index: 10;
 }
 
+/* Inventory Paneli */
+#inventory-panel {
+    position: fixed;
+    top: 70px;
+    left: 20px;
+    background: rgba(0, 50, 100, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-size: 14px;
+    z-index: 10;
+    border: 2px solid rgba(100, 150, 255, 0.5);
+    min-width: 150px;
+    text-align: center;
+}
+
+#inventory-panel.has-stone {
+    background: rgba(100, 50, 0, 0.8);
+    border-color: rgba(255, 150, 50, 0.7);
+    animation: pulse-inventory 2s infinite;
+}
+
+@keyframes pulse-inventory {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 0 5px rgba(255, 150, 50, 0.5);
+    }
+    50% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(255, 150, 50, 0.8);
+    }
+}
+
 /* Kontrol Paneli */
 #controls-panel {
     position: fixed;

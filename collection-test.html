@@ -41,14 +41,33 @@
         .test-btn:hover {
             background: #66ff66;
         }
-        
-        #status-container {
+          #status-container {
             margin-top: 10px;
             font-size: 12px;
             padding: 5px;
             border: 1px solid #444;
             background: #222;
             height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        #console-log {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #00ff00;
+            padding: 10px;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 11px;
+            overflow-y: auto;
+            z-index: 1000;
+            border-radius: 5px;
+        }
             overflow-y: auto;
         }
         

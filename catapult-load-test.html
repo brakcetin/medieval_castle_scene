@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catapult Loading Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .container {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 40px);
+        }
+        
+        .test-panel {
+            width: 400px;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .game-container {
+            flex: 1;
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #gameFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 10px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .status-item {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .status-item.warning {
+            border-left-color: #FF9800;
+        }
+        
+        .status-item.error {
+            border-left-color: #F44336;
+        }
+        
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+        
+        .test-section h3 {
+            margin: 0 0 10px 0;
+            color: #64B5F6;
+        }
+        
+        .test-button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .test-button.warning {
+            background: linear-gradient(45deg, #FF9800, #F57C00);
+        }
+        
+        .test-button.danger {
+            background: linear-gradient(45deg, #F44336, #D32F2F);
+        }
+        
+        .console-output {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        
+        .instructions {
+            background: rgba(33, 150, 243, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #2196F3;
+            margin-bottom: 20px;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .step-number {
+            background: #2196F3;
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-panel">
+            <h2>🏹 Catapult Loading Test</h2>
+            
+            <div class="instructions">
+                <h3>🎯 Test Instructions</h3>
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <span>Wait for game to load</span>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <span>Click on stones to collect them</span>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <span>Try to load stone into catapult</span>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <span>Check for loading errors</span>
+                </div>
+            </div>
+            
+            <div class="status-grid">
+                <div class="status-item" id="gameStatus">
+                    <strong>Game Status:</strong><br>
+                    <span id="gameStatusText">Loading...</span>
+                </div>
+                <div class="status-item" id="catapultStatus">
+                    <strong>Catapult:</strong><br>
+                    <span id="catapultStatusText">Checking...</span>
+                </div>
+                <div class="status-item" id="stoneStatus">
+                    <strong>Stones:</strong><br>
+                    <span id="stoneStatusText">Checking...</span>
+                </div>
+                <div class="status-item" id="sceneStatus">
+                    <strong>Scene:</strong><br>
+                    <span id="sceneStatusText">Checking...</span>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h3>🔧 Manual Tests</h3>
+                <button class="test-button" onclick="testSceneReferences()">Test Scene References</button>
+                <button class="test-button" onclick="testCatapultState()">Check Catapult State</button>
+                <button class="test-button" onclick="simulateStoneCollection()">Simulate Collection</button>
+                <button class="test-button warning" onclick="testCatapultLoading()">Test Loading</button>
+                <button class="test-button danger" onclick="clearConsole()">Clear Console</button>
+            </div>
+            
+            <div class="test-section">
+                <h3>📋 Console Output</h3>
+                <div class="console-output" id="consoleOutput"></div>
+            </div>
+        </div>
+        
+        <div class="game-container">
+            <iframe id="gameFrame" src="index.html"></iframe>
+        </div>
+    </div>
+
+    <script>
+        let gameWindow = null;
+        let consoleBuffer = [];
+        
+        // Initialize when iframe loads
+        document.getElementById('gameFrame').onload = function() {
+            gameWindow = this.contentWindow;
+            
+            // Override console.log in the game window to capture output
+            if (gameWindow.console) {
+                const originalLog = gameWindow.console.log;
+                const originalError = gameWindow.console.error;
+                
+                gameWindow.console.log = function(...args) {
+                    originalLog.apply(gameWindow.console, args);
+                    logToConsole('LOG', args.join(' '));
+                };
+                
+                gameWindow.console.error = function(...args) {
+                    originalError.apply(gameWindow.console, args);
+                    logToConsole('ERROR', args.join(' '));
+                };
+            }
+            
+            startMonitoring();
+        };
+        
+        function logToConsole(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type}: ${message}`;
+            
+            consoleBuffer.push(logEntry);
+            if (consoleBuffer.length > 100) consoleBuffer.shift();
+            
+            const consoleOutput = document.getElementById('consoleOutput');
+            consoleOutput.textContent = consoleBuffer.join('\n');
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        function clearConsole() {
+            consoleBuffer = [];
+            document.getElementById('consoleOutput').textContent = '';
+        }
+        
+        function updateStatus(elementId, text, type = 'normal') {
+            const element = document.getElementById(elementId);
+            const statusText = element.querySelector('span');
+            statusText.textContent = text;
+            
+            element.className = 'status-item';
+            if (type === 'error') element.classList.add('error');
+            if (type === 'warning') element.classList.add('warning');
+        }
+        
+        function startMonitoring() {
+            setInterval(() => {
+                if (!gameWindow || !gameWindow.app) {
+                    updateStatus('gameStatus', 'Not loaded', 'error');
+                    return;
+                }
+                
+                const app = gameWindow.app;
+                updateStatus('gameStatus', 'Loaded ✓', 'normal');
+                
+                // Check catapult
+                if (app.sceneManager && app.sceneManager.objects.catapult) {
+                    const catapult = app.sceneManager.objects.catapult;
+                    const hasStone = catapult.hasStone ? 'Has stone' : 'Empty';
+                    updateStatus('catapultStatus', `Ready - ${hasStone}`, 'normal');
+                } else {
+                    updateStatus('catapultStatus', 'Not found', 'error');
+                }
+                
+                // Check stones
+                if (app.sceneManager && app.sceneManager.objects.stones) {
+                    const stones = app.sceneManager.objects.stones;
+                    const collected = stones.filter(s => s.isCollected).length;
+                    updateStatus('stoneStatus', `${stones.length} total, ${collected} collected`, 'normal');
+                } else {
+                    updateStatus('stoneStatus', 'Not found', 'error');
+                }
+                
+                // Check scene
+                if (app.sceneManager && app.sceneManager.scene) {
+                    const childCount = app.sceneManager.scene.children.length;
+                    updateStatus('sceneStatus', `${childCount} objects`, 'normal');
+                } else {
+                    updateStatus('sceneStatus', 'Not found', 'error');
+                }
+                
+            }, 1000);
+        }
+        
+        function testSceneReferences() {
+            if (!gameWindow || !gameWindow.app) {
+                logToConsole('ERROR', 'Game not loaded');
+                return;
+            }
+            
+            const app = gameWindow.app;
+            logToConsole('LOG', '🔍 Testing Scene References...');
+            
+            if (app.sceneManager) {
+                logToConsole('LOG', `✓ SceneManager exists: ${app.sceneManager.constructor.name}`);
+                
+                if (app.sceneManager.scene) {
+                    logToConsole('LOG', `✓ Scene exists: ${app.sceneManager.scene.constructor.name}`);
+                    logToConsole('LOG', `✓ Scene children count: ${app.sceneManager.scene.children.length}`);
+                } else {
+                    logToConsole('ERROR', '✗ Scene not found');
+                }
+                
+                if (app.sceneManager.objects.catapult) {
+                    const catapult = app.sceneManager.objects.catapult;
+                    logToConsole('LOG', `✓ Catapult exists`);
+                    logToConsole('LOG', `  - scene property: ${catapult.scene ? catapult.scene.constructor.name : 'undefined'}`);
+                    logToConsole('LOG', `  - scene.scene property: ${catapult.scene && catapult.scene.scene ? catapult.scene.scene.constructor.name : 'undefined'}`);
+                } else {
+                    logToConsole('ERROR', '✗ Catapult not found');
+                }
+            } else {
+                logToConsole('ERROR', '✗ SceneManager not found');
+            }
+        }
+        
+        function testCatapultState() {
+            if (!gameWindow || !gameWindow.app || !gameWindow.app.sceneManager.objects.catapult) {
+                logToConsole('ERROR', 'Catapult not available');
+                return;
+            }
+            
+            const catapult = gameWindow.app.sceneManager.objects.catapult;
+            logToConsole('LOG', '🏹 Catapult State:');
+            logToConsole('LOG', `  - Has stone: ${catapult.hasStone}`);
+            logToConsole('LOG', `  - Loaded stone: ${catapult.loadedStone ? 'Yes' : 'No'}`);
+            logToConsole('LOG', `  - Model loaded: ${catapult.loaded}`);
+            logToConsole('LOG', `  - Position: (${catapult.position.x}, ${catapult.position.y}, ${catapult.position.z})`);
+        }
+        
+        function simulateStoneCollection() {
+            if (!gameWindow || !gameWindow.app) {
+                logToConsole('ERROR', 'Game not loaded');
+                return;
+            }
+            
+            const stones = gameWindow.app.sceneManager.objects.stones;
+            if (!stones || stones.length === 0) {
+                logToConsole('ERROR', 'No stones found');
+                return;
+            }
+            
+            // Find a stone that's not collected
+            const availableStone = stones.find(s => !s.isCollected && !s.isLaunched);
+            if (!availableStone) {
+                logToConsole('ERROR', 'No available stones to collect');
+                return;
+            }
+            
+            logToConsole('LOG', '🪨 Simulating stone collection...');
+            availableStone.collect();
+            logToConsole('LOG', `✓ Stone collected: ${availableStone.isCollected}`);
+        }
+        
+        function testCatapultLoading() {
+            if (!gameWindow || !gameWindow.app) {
+                logToConsole('ERROR', 'Game not loaded');
+                return;
+            }
+            
+            const app = gameWindow.app;
+            const catapult = app.sceneManager.objects.catapult;
+            const stones = app.sceneManager.objects.stones;
+            
+            if (!catapult) {
+                logToConsole('ERROR', 'Catapult not found');
+                return;
+            }
+            
+            // Find a collected stone
+            const collectedStone = stones.find(s => s.isCollected);
+            if (!collectedStone) {
+                logToConsole('ERROR', 'No collected stones available - collect a stone first');
+                return;
+            }
+            
+            logToConsole('LOG', '🎯 Testing catapult loading...');
+            logToConsole('LOG', `Selected stone: isCollected=${collectedStone.isCollected}, hasMesh=${!!collectedStone.mesh}`);
+            
+            try {
+                const result = catapult.loadStone(collectedStone);
+                logToConsole('LOG', `Loading result: ${result}`);
+                
+                if (result) {
+                    logToConsole('LOG', '✅ Stone loading successful!');
+                    logToConsole('LOG', `Catapult hasStone: ${catapult.hasStone}`);
+                } else {
+                    logToConsole('ERROR', '❌ Stone loading failed');
+                }
+            } catch (error) {
+                logToConsole('ERROR', `❌ Loading error: ${error.message}`);
+                logToConsole('ERROR', `Error stack: ${error.stack}`);
+            }
+        }
+    </script>
+</body>
+</html>

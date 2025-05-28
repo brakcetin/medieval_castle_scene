@@ -73,8 +73,7 @@ class App {
             hasRock: false,
             collectedStone: null 
         };
-        
-        // Bildirim sistemi
+          // Bildirim sistemi
         this.notificationTimeout = null;
         this.catapultState = 'empty'; // 'empty', 'loaded', 'ready'
         
@@ -589,8 +588,7 @@ class App {
     cleanupNullObjects() {
         if (!this.sceneManager.objects) return;
         
-        try {
-            // Null taşları temizle
+        try {            // Null taşları temizle
             if (this.sceneManager.objects.stones && Array.isArray(this.sceneManager.objects.stones)) {
                 const originalLength = this.sceneManager.objects.stones.length;
                 this.sceneManager.objects.stones = this.sceneManager.objects.stones.filter(stone => {
@@ -598,7 +596,14 @@ class App {
                     if (!stone) return false;
                     if (!stone.mesh) return false;
                     if (!stone.mesh.position) return false;
-                    if (stone.isCollected) return false; // Remove collected stones
+                    if (stone.isCollected) {
+                        // Toplanan taşları tamamen kaldır
+                        console.log("Removing collected stone from array");
+                        if (stone.mesh && stone.mesh.parent) {
+                            stone.mesh.parent.remove(stone.mesh);
+                        }
+                        return false;
+                    }
                     return true;
                 });
                 
@@ -849,28 +854,52 @@ class App {
                 this.moveRight = false;
                 break;
         }
-    }
-      onMouseDown(event) {
+    }    onMouseDown(event) {
         // Sol tık (button === 0) ve sağ tık (button === 2) ile kamera kontrolü
         if (event.button === 0 || event.button === 2) {
             this.canRotate = true;
             this.lastMouseX = event.clientX;
             this.lastMouseY = event.clientY;
-            event.preventDefault();
             
-            // Pointer lock sistemi için canvas'ı aktif et
-            const canvas = document.getElementById('scene-canvas');
-            if (canvas && document.pointerLockElement !== canvas) {
-                canvas.requestPointerLock();
-            }
+            // Store click position for click detection
+            this.clickStartPos = { x: event.clientX, y: event.clientY };
+            this.clickStartTime = Date.now();
+            
+            // Only prevent default for mouse movement, not clicks
+            // event.preventDefault(); // Commented out to allow click events
+            
+            // Pointer lock sistemi için canvas'ı aktif et (sadece drag işlemi için)
+            // const canvas = document.getElementById('scene-canvas');
+            // if (canvas && document.pointerLockElement !== canvas) {
+            //     canvas.requestPointerLock();
+            // }
         }
     }
-    
-    onMouseUp(event) {
+      onMouseUp(event) {
         // Sol tık ve sağ tık için kamera kontrolünü durdur
         if (event.button === 0 || event.button === 2) {
             this.canRotate = false;
-            event.preventDefault();
+            
+            // Check if this was a click (not a drag)
+            const timeDiff = Date.now() - (this.clickStartTime || 0);
+            const moveDistance = this.clickStartPos ? 
+                Math.sqrt(
+                    Math.pow(event.clientX - this.clickStartPos.x, 2) + 
+                    Math.pow(event.clientY - this.clickStartPos.y, 2)
+                ) : 0;
+            
+            // If it was a quick click without much movement, treat as click
+            if (timeDiff < 200 && moveDistance < 5) {
+                console.log("Quick click detected, allowing click event to fire");
+                // Don't prevent default to allow click event
+            } else {
+                console.log("Drag detected, preventing click event");
+                // event.preventDefault(); // Still prevent for drags
+            }
+            
+            // Reset click tracking
+            this.clickStartPos = null;
+            this.clickStartTime = null;
             
             // Pointer lock'u serbest bırak
             if (document.pointerLockElement) {
@@ -901,24 +930,67 @@ class App {
             // Pitch sınırları (yukarı/aşağı bakma)
             this.cameraPitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, this.cameraPitch));
         }
-    }
-      onClick(event) {
+    }    onClick(event) {
         try {
+            console.log("=== CLICK EVENT FIRED ===");
+            console.log("Click coordinates:", event.clientX, event.clientY);
+            console.log("Window size:", window.innerWidth, window.innerHeight);
+            
             // Mouse pozisyonunu normalize et
             this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
             
-            // Raycasting
+            console.log("Normalized mouse coords:", this.mouse.x, this.mouse.y);
+              // Raycasting - sadece görünür ve aktif nesneleri kontrol et
             this.raycaster.setFromCamera(this.mouse, this.camera);
             
-            // Tıklanabilir nesnelerle intersection kontrol et
-            const intersects = this.raycaster.intersectObjects(this.sceneManager.scene.children, true);
+            // Önce tüm intersections'ı al
+            const allIntersects = this.raycaster.intersectObjects(this.sceneManager.scene.children, true);
+            
+            // Sadece görünür ve clickable nesneleri filtrele
+            const intersects = allIntersects.filter(intersection => {
+                const obj = intersection.object;
+                
+                // Görünür olmalı
+                if (!obj.visible) return false;
+                
+                // Parent'ı da görünür olmalı (recursive check)
+                let parent = obj.parent;
+                while (parent) {
+                    if (!parent.visible) return false;
+                    parent = parent.parent;
+                }
+                
+                // Eğer userData varsa, type kontrolü yap
+                if (obj.userData && obj.userData.type === 'collected_stone') {
+                    return false; // Topunanmış taşları dahil etme
+                }
+                
+                return true;
+            });
+            
+            console.log(`Total intersections: ${allIntersects.length}, Filtered: ${intersects.length}`);
             
             console.log(`Click detected, ${intersects.length} intersections found`);
-            
-            if (intersects.length > 0) {
+              if (intersects.length > 0) {
                 const clickedObject = intersects[0].object;
-                console.log("Clicked object:", clickedObject.name, clickedObject.uuid);
+                
+                // ÖNCE görünürlük kontrolü yap - görünmez objeleri tamamen atla
+                if (!clickedObject.visible) {
+                    console.log("🚫 Clicked object is invisible, skipping");
+                    return;
+                }
+                
+                console.log("=== CLICK DEBUG ===");
+                console.log("Clicked object type:", clickedObject.type);
+                console.log("Clicked object name:", clickedObject.name);
+                console.log("Clicked object UUID:", clickedObject.uuid);
+                console.log("Clicked object userData:", clickedObject.userData);
+                console.log("Clicked object visible:", clickedObject.visible);
+                console.log("Clicked object parent:", clickedObject.parent?.type);
+                console.log("Distance:", intersects[0].distance);
+                console.log("==================");
+                
                   // Taş toplama kontrolü - önce userData kontrolü yap, sonra stones array'inde ara
                 let stone = null;
                 
@@ -927,12 +999,17 @@ class App {
                     stone = clickedObject.userData.stoneRef;
                     console.log("Stone found via userData");
                 }
-                
-                // Method 2: stones array'inde mesh'i match eden taşı bul
+                  // Method 2: stones array'inde mesh'i match eden taşı bul
                 if (!stone && this.sceneManager.objects.stones && Array.isArray(this.sceneManager.objects.stones)) {
                     stone = this.sceneManager.objects.stones.find(s => {
                         // Check if the clicked object matches this stone's mesh or is a child of it
                         if (!s || !s.mesh) return false;
+                        
+                        // ÖNCE collection durumunu kontrol et
+                        if (s.isCollected || s.isBeingCollected) return false;
+                        
+                        // Mesh'in görünür olduğunu kontrol et
+                        if (!s.mesh.visible) return false;
                         
                         if (s.mesh === clickedObject) return true;
                         
@@ -948,76 +1025,76 @@ class App {
                       if (stone) {
                         console.log("Stone found via array search");
                     }
-                }                // Stone collection logic
-                if (stone && !stone.isCollected) {
+                }                // Stone collection logic - let collect() method handle its own locking
+                if (stone && !stone.isCollected && !stone.isBeingCollected) {
+                    
+                    // 🚨 INVENTORY KONTROLÜ - Envanterde zaten taş varsa yeni taş almayı engelle
+                    if (this.playerInventory.hasRock && this.playerInventory.collectedStone) {
+                        console.log("🚫 ENVANTER DOLU! Mevcut taşı mancınığa yerleştirmeden yeni taş alamazsınız!");
+                        this.showNotification("Envanterde zaten taş var! Önce mancınığa yerleştirin.", 3000, 'warning');
+                        return; // Yeni taş almayı engelle
+                    }
+                    
                     console.log("Stone found and collecting...");
-                    if (stone.collect && typeof stone.collect === 'function') {
-                        const collected = stone.collect();
-                        if (collected) {
+                    
+                    console.log("Stone mesh visible before collection:", stone.mesh ? stone.mesh.visible : "no mesh");
+                    console.log("Stone mesh parent before collection:", stone.mesh ? stone.mesh.parent?.type : "no mesh");
+                    console.log("Stone in scene before collection:", stone.mesh ? this.sceneManager.scene.children.includes(stone.mesh) : "no mesh");
+                      if (stone.collect && typeof stone.collect === 'function') {
+                        const collected = stone.collect();if (collected) {
+                            console.log("✅ TAŞ BAŞARIYLA TOPLANDI - tek tıklamada!");
+                              // Score ve inventory güncelle
                             this.updateScore(10);
                             console.log("Taş toplandı! +10 puan");
                             this.playerInventory.hasRock = true; // Taşı envantere ekle
                             this.playerInventory.collectedStone = stone; // Taşı referansını sakla
-                              // Ekranda toplama mesajı göster - başarı tipinde bildirim
+                            
+                            // Envanter UI'nı güncelle
+                            this.updateInventoryUI();
+                            
+                            // Ekranda toplama mesajı göster
                             this.showNotification("Taş toplandı! Mancınığa yüklemek için mancınığa tıklayın.", 3000, 'success');
                             
-                            // Taşın pozisyonunu takip edebilmek için position değerini güncelle
-                            if (!stone.position) {
-                                stone.position = new THREE.Vector3();
-                            }
-                            if (stone.mesh) {
-                                stone.position.copy(stone.mesh.position);
-                            }
-                        }
-                    } else {
-                        console.warn("Stone doesn't have collect method");
-                    }                } else if (stone && stone.isCollected) {
-                    console.log("Stone already collected");
-                    this.showNotification("Bu taş zaten toplanmış.", 2000, 'info');
-                } 
-                // Mancınık kontrolü
-                else if (clickedObject.userData && clickedObject.userData.type === 'catapult_part') {
-                    console.log("Mancınık tıklandı");
-                    // Oyuncunun envanterinde taş varsa mancınığa yükle
-                    if (this.playerInventory.hasRock && this.playerInventory.collectedStone) {
-                        const catapult = this.sceneManager.objects.catapult;
-                        if (catapult && !catapult.hasStone) {
-                            console.log("Taş mancınığa yükleniyor...");
-                            
-                            // Önce mesh'in görünürlüğünü sağla
-                            if (this.playerInventory.collectedStone.mesh) {
-                                this.playerInventory.collectedStone.mesh.visible = true;
-                            }
-                            
-                            // Taşı mancınığa yükle
-                            const loaded = catapult.loadStone(this.playerInventory.collectedStone);
-                            
-                            if (loaded) {
-                                this.playerInventory.hasRock = false;
-                                this.playerInventory.collectedStone = null;
-                                  // Başarılı yükleme bildirimi göster
-                                this.showNotification("Taş mancınığa yüklendi. Fırlatmak için tekrar tıklayın!", 3000, 'success');
-                            }
-                        } else if (catapult && catapult.hasStone) {
-                            // Mancınık zaten yüklüyse fırlat
-                            console.log("Mancınıktan taş fırlatılıyor...");
-                            this.sceneManager.launchStone();
-                            this.showNotification("Taş fırlatıldı!", 3000, 'success');
-                        }
-                    } else if (this.sceneManager.objects.catapult && this.sceneManager.objects.catapult.hasStone) {                        // Mancınık dolu ve tıklandığında fırlat
-                        console.log("Mancınıktan taş fırlatılıyor...");
-                        this.sceneManager.launchStone();
-                        this.showNotification("Taş fırlatıldı!", 3000, 'success');} else {                        // Taş yok uyarısı
-                        this.showNotification("Önce bir taş toplamalısınız!", 3000, 'warning');
-                    }
-                } else if (!stone) {
-                    console.log("No stone found for clicked object");
-                }
+                            // Collection başarılı oldu, işlemi sonlandır
+                            return;
+                        } else {
+                            console.log("❌ Collection failed");
+                            stone.isBeingCollected = false; // Lock'u kaldır
+                        }                    }                } else if (stone && (stone.isCollected || stone.isBeingCollected)) {
+                    console.log("⚠️ Bu taş zaten toplandı veya toplanıyor - yeni tıklama engellendi");
+                    return;                }
                 
-                // Mancınık etkileşimi
-                if (clickedObject.userData && clickedObject.userData.type === 'catapult') {
-                    console.log("Mancınığa tıklandı!");
-                    // Mancınık logic burada
+                // Mancınık kontrolü - taş yükleme ve fırlatma
+                else if (clickedObject.userData && (clickedObject.userData.type === 'catapult_part' || clickedObject.userData.type === 'catapult')) {
+                    console.log("🏹 Mancınık tıklandı");
+                    
+                    const catapult = this.sceneManager.objects.catapult;
+                    
+                    // Oyuncunun envanterinde taş varsa mancınığa yükle
+                    if (this.playerInventory.hasRock && this.playerInventory.collectedStone && catapult && !catapult.hasStone) {
+                        console.log("📦 Taş mancınığa yükleniyor...");
+                        
+                        const loaded = catapult.loadStone(this.playerInventory.collectedStone);
+                          if (loaded) {
+                            this.playerInventory.hasRock = false;
+                            this.playerInventory.collectedStone = null;
+                            
+                            // Envanter UI'nı güncelle
+                            this.updateInventoryUI();
+                            
+                            this.showNotification("✅ Taş mancınığa yüklendi! Fırlatmak için tekrar tıklayın!", 3000, 'success');
+                        }
+                    } 
+                    // Mancınık zaten yüklüyse fırlat
+                    else if (catapult && catapult.hasStone) {
+                        console.log("🚀 Mancınıktan taş fırlatılıyor...");
+                        this.sceneManager.launchStone();
+                        this.showNotification("🚀 Taş fırlatıldı!", 3000, 'success');
+                    } 
+                    // Taş yok uyarısı
+                    else {
+                        this.showNotification("⚠️ Önce bir taş toplamalısınız!", 3000, 'warning');
+                    }
                 }
                 
                 // Debug için - genel nesne bilgisi
@@ -1100,22 +1177,39 @@ class App {
         // Belirli bir süre sonra bildirim kaybolsun
         this.notificationTimeout = setTimeout(() => {
             notificationElement.style.opacity = '0';
-            notificationElement.style.transform = 'translateX(-50%) translateY(20px)';
-        }, duration);
+            notificationElement.style.transform = 'translateX(-50%) translateY(20px)';        }, duration);
+    }
+    
+    // Envanter UI'nı güncelleyen fonksiyon
+    updateInventoryUI() {
+        const inventoryElement = document.getElementById('inventory-status');
+        if (!inventoryElement) return;
+        
+        if (this.playerInventory.hasRock && this.playerInventory.collectedStone) {
+            inventoryElement.textContent = '🗿 Envanter: Taş Var';
+            inventoryElement.style.color = '#4CAF50'; // Yeşil
+            inventoryElement.style.fontWeight = 'bold';
+        } else {
+            inventoryElement.textContent = '🎒 Envanter: Boş';
+            inventoryElement.style.color = '#666';
+            inventoryElement.style.fontWeight = 'normal';
+        }
     }
 }
 
 // Uygulamayı başlat
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("DOM yüklendi, uygulama başlatılıyor...");
-    
-    try {
+      try {
         // AssetLoader'ı ilk olarak yükle ve ön yükleme yap
         const { assetLoader } = await import('./AssetLoader.js');
         console.log("AssetLoader hazırlanıyor...");
         
         // Uygulamayı başlat
         const app = new App();
+        
+        // Global App referansını window'a ata (diagnostic tools için)
+        window.app = app;
         
         // Global resetScene referansını ata
         if (!window.resetScene) {
@@ -1124,6 +1218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         console.log("Uygulama başarıyla başlatıldı");
+        console.log("window.app global referansı oluşturuldu");
     } catch (error) {
         console.error("Uygulama başlatılırken hata oluştu:", error);
     }

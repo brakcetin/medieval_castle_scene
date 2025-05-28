@@ -6,7 +6,14 @@
     <title>Ortaçağ Kale Sahnesi</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body>    <div id="score-panel">Puan: <span id="score">0</span></div>    <div id="controls-panel">
+<body>    <div id="score-panel">Puan: <span id="score">0</span></div>
+    
+    <!-- Inventory Indicator -->
+    <div id="inventory-panel">
+        <span id="inventory-status">🎒 Envanter: Boş</span>
+    </div>
+    
+    <div id="controls-panel">
         <button id="day-night-toggle">Gece/Gündüz</button>
     </div>
     <div id="time-control-panel">
@@ -37,12 +44,19 @@
     </script>
     
     <!-- dat.GUI Kütüphanesi -->
-    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
-      <!-- Uygulama Kodları -->
-    <script type="module" src="js/main.js"></script>    <script>
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>    <!-- Uygulama Kodları -->
+    <script type="module" src="js/main.js"></script>
+      <!-- Stone Click Diagnosis Tool -->
+    <script type="module" src="stone-click-diagnosis.js"></script>
+    
+    <!-- Hızlı Taş Tıklama Test Scripti -->
+    <script src="hizli-test.js"></script>
+    
+    <script>
         // Sayfa yüklendiğinde otomatik olarak sahneyi sıfırla
         window.addEventListener('load', function() {
             console.log("Sayfa yüklendi, uygulama başlatılıyor...");
+            console.log("💡 Taş tıklama testi için F12 açın ve console'u kontrol edin");
             // resetScene fonksiyonu App sınıfı içinde tanımlanacak, 
             // bu yüzden sadece uygulamanın başlamasına izin ver
         });
