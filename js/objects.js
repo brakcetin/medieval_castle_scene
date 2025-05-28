@@ -223,8 +223,7 @@ export class Catapult {
             return true;
         }
         return false;
-    }
-      launch() {
+    }    launch() {
         if (this.hasStone && this.loadedStone) {
             const stone = this.loadedStone;
             this.hasStone = false;
@@ -241,6 +240,11 @@ export class Catapult {
             // Yüklü bir taş kullanıldı, isCollected değerini sıfırlayalım
             // böylece atış sonrası tekrar toplanabilmez
             stone.isCollected = false;
+            
+            // Mancınık ateşleme sesini çal
+            if (window.getSesYoneticisi) {
+                window.getSesYoneticisi().catapultAtesle();
+            }
             
             console.log("Mancınıktan taş fırlatıldı");
             
@@ -281,6 +285,9 @@ export class Stone {
             this.mesh.position.copy(this.position);
             this.mesh.scale.set(0.25, 0.25, 0.25); // Boyutu küçülttük
             
+            // Taşı yere daha yakın yerleştir
+            this.mesh.position.y = 0.02; // Taşın alt kısmı yere değsin
+            
             // Stone için identifier ekle
             this.mesh.name = `stone_${Math.random().toString(36).substr(2, 9)}`;
             this.mesh.userData = {
@@ -304,8 +311,7 @@ export class Stone {
             
             this.scene.scene.add(this.mesh); // SceneManager'dan scene'e erişim
             console.log("Taş sahneye eklendi");
-        }, undefined, (error) => {            console.error("Taş modeli yüklenirken hata:", error);            console.log("Fallback küre geometrisi oluşturuluyor");
-              const geometry = new THREE.SphereGeometry(0.3, 16, 16); // Boyutu küçülttük (1.2'den 0.3'e)
+        }, undefined, (error) => {            console.error("Taş modeli yüklenirken hata:", error);            console.log("Fallback küre geometrisi oluşturuluyor");            const geometry = new THREE.SphereGeometry(0.3, 16, 16); // Boyutu küçülttük (1.2'den 0.3'e)
             const material = new THREE.MeshStandardMaterial({ 
                 color: 0xFF4444,  // Parlak kırmızı renk
                 roughness: 0.3,
@@ -314,6 +320,9 @@ export class Stone {
                 emissiveIntensity: 0.3
             });            this.mesh = new THREE.Mesh(geometry, material);
             this.mesh.position.copy(this.position);
+            
+            // Taşı yere çok yakın yerleştir
+            this.mesh.position.y = 0.02;
             this.mesh.castShadow = true;
             
             // Fallback stone için de identifier ekle
@@ -367,21 +376,20 @@ export class Stone {
             if (this.lifetime <= 0) {
                 this.remove();
                 return;
-            }
-                  // Check for ground collision
-            if (this.position.y <= this.radius * 0.5) { // Yarıçapın yarısı kadar mesafe yeterli
-                this.position.y = this.radius * 0.5; // Taş yarı yarıya toprağa gömülü olsun
-                this.velocity.y *= -0.3; // Zıplama etkisini azalt (0.5 -> 0.3)
-                this.velocity.x *= 0.8; // Sürtünmeyi artır (0.9 -> 0.8)
-                this.velocity.z *= 0.8; // Sürtünmeyi artır (0.9 -> 0.8)
+            }            // Check for ground collision
+            if (this.position.y <= this.radius * 0.1) { // Daha az mesafede yere değsin (tam yere yakın)
+                this.position.y = this.radius * 0.1; // Taş neredeyse tamamen yere otursun
+                this.velocity.y *= -0.3; // Zıplama etkisini azalt
+                this.velocity.x *= 0.8; // Sürtünmeyi artır
+                this.velocity.z *= 0.8; // Sürtünmeyi artır
                 
                 // If velocity is very low, stop movement                
                 if (this.velocity.length() < 1) {
                     this.velocity.set(0, 0, 0);
                     this.isStatic = true; // Performans için statik yap
                     
-                    // Taş durduğunda tam olarak yere otursun
-                    this.position.y = this.radius;
+                    // Taş durduğunda tamamen yere otursun
+                    this.position.y = this.radius * 0.1; // Taş tamamen yere yakın olsun
                 }
             }
         } else {
@@ -513,6 +521,11 @@ export class Stone {
                 isBeingCollected: this.isBeingCollected
             });
             return false;
+        }
+        
+        // Taş toplama sesini çal
+        if (window.getSesYoneticisi) {
+            window.getSesYoneticisi().tasTopla();
         }
         
         // ÖNCE flags'i ayarla - çok önemli!

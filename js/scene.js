@@ -126,8 +126,7 @@ export class SceneManager {
         };
         
         console.log("Sahne temizlendi - kalan nesne sayısı:", this.scene.children.length);
-    }
-      setupLighting() {
+    }    setupLighting() {
         // Ambient light - genel ortam ışığı
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         this.scene.add(this.ambientLight);
@@ -137,15 +136,19 @@ export class SceneManager {
         this.directionalLight.position.set(50, 200, 100);
         this.directionalLight.castShadow = true;
         
-        // Gölge ayarları - performans için düşük çözünürlük
-        this.directionalLight.shadow.mapSize.width = 512; // 1024'den 512'ye düşürüldü
-        this.directionalLight.shadow.mapSize.height = 512; // 1024'den 512'ye düşürüldü
+        // Gölge ayarları - daha iyi gölge kalitesi için orta çözünürlük
+        this.directionalLight.shadow.mapSize.width = 1024; // Daha iyi kalite için 512'den 1024'e çıkarıldı
+        this.directionalLight.shadow.mapSize.height = 1024; // Daha iyi kalite için 512'den 1024'e çıkarıldı
         this.directionalLight.shadow.camera.near = 10;
-        this.directionalLight.shadow.camera.far = 200; // 400'den 200'e düşürüldü
-        this.directionalLight.shadow.camera.left = -30; // -50'den -30'a
-        this.directionalLight.shadow.camera.right = 30; // 50'den 30'a
-        this.directionalLight.shadow.camera.top = 30; // 50'den 30'a
-        this.directionalLight.shadow.camera.bottom = -30; // -50'den -30'a
+        this.directionalLight.shadow.camera.far = 200; 
+        this.directionalLight.shadow.camera.left = -30;
+        this.directionalLight.shadow.camera.right = 30;
+        this.directionalLight.shadow.camera.top = 30;
+        this.directionalLight.shadow.camera.bottom = -30;
+        
+        // Gölge kalitesini artırmak için ek ayarlar
+        this.directionalLight.shadow.bias = -0.0005; // Gölge artefaktlarını azaltma
+        this.directionalLight.shadow.normalBias = 0.02; // Normal bias ile daha doğru gölgeler
         
         this.scene.add(this.directionalLight);
     }
@@ -397,15 +400,18 @@ export class SceneManager {
             this.objects.stones = [];
         }        // Mancınığın yanında tıklanabilir kayalar oluştur (sağ tarafta)
         const catapultPos = this.objects.catapult ? this.objects.catapult.position : new THREE.Vector3(0, 0, 10);
-        console.log("Mancınık pozisyonu:", catapultPos);        // Taşları mancınığın etrafına yere/zemine yerleştir
+        console.log("Mancınık pozisyonu:", catapultPos);        
+        
+        // Taşları mancınığın sağ tarafına yan yana düzgün bir şekilde yerleştir
+        // Yükseklik 0.2'den 0.02'ye düşürülerek taşlar yere daha yakın konumlandırıldı
         const stonePositions = [
-            new THREE.Vector3(11, 0.2, 9),   // Mancınığın sağ tarafında
-            new THREE.Vector3(10.5, 0.2, 10.5), // Mancınığın sağ arka tarafında
-            new THREE.Vector3(9, 0.2, 11),   // Mancınığın arkasında
-            new THREE.Vector3(-1, 0.2, 11),  // Mancınığın sol tarafında
-            new THREE.Vector3(-0.5, 0.2, 10), // Mancınığın sol ön tarafında
-            new THREE.Vector3(2, 0.2, 9.5),  // Mancınığın önünde sağda
-            new THREE.Vector3(-2, 0.2, 9.5)  // Mancınığın önünde solda
+            new THREE.Vector3(6, 0.02, 11),    // İlk taş
+            new THREE.Vector3(7, 0.02, 11),    // İkinci taş
+            new THREE.Vector3(8, 0.02, 11),    // Üçüncü taş
+            new THREE.Vector3(9, 0.02, 11),    // Dördüncü taş
+            new THREE.Vector3(10, 0.02, 11),   // Beşinci taş
+            new THREE.Vector3(11, 0.02, 11),   // Altıncı taş
+            new THREE.Vector3(12, 0.02, 11)    // Yedinci taş
         ];
 
         for (let i = 0; i < stonePositions.length; i++) {

@@ -1,11 +1,28 @@
 // 🎯 HIZLI TAŞ TIKLAMA DOĞRULAMA
 console.log("🚀 Hızlı taş tıklama doğrulaması başlatılıyor...");
 
+// Uygulamanın yüklenmesini bekle ve hazır olduğunda testi başlat
+window.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        // Biraz bekleyerek uygulamanın yüklenmesi için zaman tanı
+        if (window.app) {
+            console.log("✅ App yüklendi, test başlatılıyor...");
+            hizliTaşTest();
+        } else {
+            console.log("⏳ App henüz yüklenmedi, 3 saniye daha bekleniyor...");
+            setTimeout(function() {
+                hizliTaşTest();
+            }, 3000);
+        }
+    }, 1000);
+});
+
 function hizliTaşTest() {
     console.log("\n🔍 === HIZLI TAŞ TEST ===");
     
     if (!window.app || !window.app.sceneManager) {
         console.error("❌ Oyun yüklenmemiş!");
+        console.error("💡 İpucu: Ana uygulama yüklenmiyor. Konsolu kontrol edin ve syntax hatalarını düzeltin.");
         return;
     }
     

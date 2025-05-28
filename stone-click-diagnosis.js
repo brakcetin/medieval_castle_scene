@@ -1,11 +1,22 @@
 // Quick diagnostic tool to check stone click issues
 console.log("🔍 Stone Click Diagnostic Tool");
 
+// Sayfa tamamen yüklendiğinde testi çalıştır
+window.addEventListener('load', function() {
+    console.log("📋 Diagnostic tool loaded. Call diagnoseStonesClickability() manually or wait 3 seconds for auto-run.");
+    
+    // 3 saniye sonra otomatik olarak çalıştır
+    setTimeout(function() {
+        diagnoseStonesClickability();
+    }, 3000);
+});
+
 function diagnoseStonesClickability() {
     console.log("=== STONE CLICK DIAGNOSIS ===");
     
     if (!window.app || !window.app.sceneManager) {
         console.log("❌ App or SceneManager not found");
+        console.log("💡 İpucu: window.app nesnesi yüklenmiyor. main.js dosyasındaki syntax hatalarını kontrol edin.");
         return;
     }
     

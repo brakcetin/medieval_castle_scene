@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as dat from 'dat.gui';
 import { SceneManager } from './scene.js';
 import { Catapult, Stone, Torch, HandTorch } from './objects.js';
+import { BasitSoundManager } from './SoundManager.js';
 
 // Ana uygulama sınıfı
 class App {
@@ -21,16 +22,22 @@ class App {
         this.sceneManager = null;
         
         // Kullanıcı girdisi
-        this.keys = {};
-        
-        // Zaman takibi
+        this.keys = {};        // Zaman takibi
         this.clock = new THREE.Clock();
         this.deltaTime = 0;
-          // Işık ve gökyüzü ayarları
-        this.isDay = true;
-        this.gui = null;
-        this.timeOfDay = 12; // 0-24 saat arası (12 = öğlen)
+        this.lastTimeUpdate = 0;
+        this.lastShadowUpdate = 0; // Gölgelerin son güncellendiği zamanı tutmak için
+          // Işık ve gökyüzü ayarları        this.isDay = true;
+        this.gui = null;        this.timeOfDay = 12; // 0-24 saat arası (12 = öğlen)
         this.sunAngle = 0; // Güneşin açısı
+        this.autoTimeFlow = true; // Otomatik zaman akışı
+        this.timeFlowSpeed = 0.2; // Zaman akış hızı (saat/dakika) - daha yavaş ve gerçekçi
+        this.shadowUpdateFrequency = 20; // Gölge güncelleme sıklığı (saniye) - daha yavaş güncelleme
+        
+        // Güneş pozisyonu interpolasyonu için yeni değişkenler
+        this.currentSunPosition = new THREE.Vector3(0, 100, 0);
+        this.targetSunPosition = new THREE.Vector3(0, 100, 0);
+        this.sunLerpFactor = 0.02; // Yumuşak geçiş faktörü
         
         // Özel meşale
         this.handTorch = null;
@@ -80,8 +87,14 @@ class App {
         // Başlatma
         this.init();
     }
-    
-    init() {        // Renderer oluşturma - performans odaklı ayarlar
+      init() {        
+        // Ses yöneticisini başlat
+        if (window.getSesYoneticisi) {
+            window.getSesYoneticisi(); // İlk çağrı ses yöneticisini oluşturur
+            console.log("🔊 Ses sistemi başlatıldı");
+        }
+        
+        // Renderer oluşturma - performans odaklı ayarlar
         this.renderer = new THREE.WebGLRenderer({
             canvas: document.getElementById('scene-canvas'),
             antialias: false, // Antialiasing kapalı (performans artışı)
@@ -94,15 +107,16 @@ class App {
         // Performans ayarları
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Pixel ratio sınırlandı
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        
-        // Gölge ayarları - performans odaklı
+          // Gölge ayarları - daha iyi kalite ve performans dengesi
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.BasicShadowMap; // En hızlı gölge tipi
-        this.renderer.shadowMap.autoUpdate = false; // Manuel güncelleme
-        
-        // Renderer optimizasyonları
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Daha yumuşak gölgeler için PCFSoftShadowMap
+        this.renderer.shadowMap.autoUpdate = false; // Manuel güncelleme (kontrollü performans için)
+          // Renderer optimizasyonları
         this.renderer.sortObjects = false; // Sorting'i kapat
-        this.renderer.autoClear = true;// Kamera oluşturma
+        this.renderer.autoClear = true;
+        
+        // Gölge güncelleme zamanını izle
+        this.lastShadowUpdate = 0;// Kamera oluşturma
         this.camera = new THREE.PerspectiveCamera(
             75, 
             window.innerWidth / window.innerHeight,
@@ -202,9 +216,11 @@ class App {
                 console.log("dat.GUI başarıyla oluşturuldu");
                 
                 // Zaman Kontrolü
-                const timeFolder = this.gui.addFolder('Zaman Ayarları');
+        const timeFolder = this.gui.addFolder('Zaman Ayarları');
                 const timeSettings = {
-                    saatAyarı: 12
+                    saatAyarı: 12,
+                    otomatikZamanAkışı: this.autoTimeFlow,
+                    zamanAkışHızı: this.timeFlowSpeed
                 };
                 
                 timeFolder.add(timeSettings, 'saatAyarı', 0, 24).onChange((value) => {
@@ -213,7 +229,37 @@ class App {
                     // HTML slider'ı da güncelle
                     if (timeSlider) timeSlider.value = value;
                     if (timeDisplay) timeDisplay.textContent = value.toFixed(1);
-                });
+                });                timeFolder.add(timeSettings, 'otomatikZamanAkışı').onChange((value) => {
+                    this.autoTimeFlow = value;
+                }).name('Otomatik Zaman');
+                
+                timeFolder.add(timeSettings, 'zamanAkışHızı', 0.01, 0.5).onChange((value) => {
+                    this.timeFlowSpeed = value;
+                }).name('Zaman Hızı');
+                  // Gölge güncelleme sıklığı ve yumuşaklık ayarları
+                const shadowSettings = {
+                    gölgeGüncelleme: this.shadowUpdateFrequency,
+                    geçişHızı: this.sunLerpFactor * 100 // 0-100 arası değer
+                };
+                
+                timeFolder.add(shadowSettings, 'gölgeGüncelleme', 1, 60, 1).onChange((value) => {
+                    this.shadowUpdateFrequency = value;
+                }).name('Gölge Güncelleme (sn)');
+                
+                timeFolder.add(shadowSettings, 'geçişHızı', 0.1, 10).onChange((value) => {
+                    this.sunLerpFactor = value / 100; // 0.0001 - 0.1 arası değer
+                }).name('Gölge Yumuşaklığı');
+                
+                // Hemen gölgeleri güncelleme butonu
+                const timeActions = {
+                    gölgeleriGüncelle: () => {
+                        this.updateSunPosition(this.timeOfDay, null, null, true);
+                        console.log("Gölgeler manuel olarak güncellendi");
+                    }
+                };
+                
+                timeFolder.add(timeActions, 'gölgeleriGüncelle').name('Gölgeleri Güncelle');
+                
                 timeFolder.open();
                 console.log("dat.GUI zaman kontrol slider'ı eklendi");
             }
@@ -262,71 +308,270 @@ class App {
         };
         
         cameraFolder.add(cameraSettings, 'speed', 1, 10);
+    }      // Saate göre gün/gece döngüsü - gerçekçi geçişli
+    updateTimeOfDay(hour, updateShadows = true) {
+        // Zaman faktörü hesapla (0-1 arası değer)
+        // 0: tam gece (gece 0:00), 0.5: öğlen (12:00), 1: tekrar gece (24:00)
+        const timeFactor = hour / 24;
+        
+        // Güneşin açısı (0-2PI arası) - tam bir dönüş
+        // Daha gerçekçi bir güneş eğrisi için eliptik yörünge kullan
+        this.sunAngle = timeFactor * Math.PI * 2;
+        
+        // Güneş için gerçekçi bir yükseklik faktörü hesapla
+        // 0 = gece yarısı, 1 = öğle vakti
+        const dayProgress = (hour >= 6 && hour <= 18) 
+            ? (hour - 6) / 12  // Gün içi (6-18 arası)
+            : (hour < 6) 
+                ? 0  // Gece yarısı ile şafak arası (0-6)
+                : 0; // Gün batımı ile gece yarısı arası (18-24)
+        
+        // Güneşin yüksekliği için sinüs eğrisi kullan 
+        // Bu daha gerçekçi bir güneş arkı oluşturuyor
+        const sunHeight = Math.sin(dayProgress * Math.PI);
+        
+        // Gündüz-gece geçişleri için hassas zamanlar
+        const isMorning = hour >= 5 && hour <= 8;     // Şafak/gün doğumu
+        const isEvening = hour >= 17 && hour <= 20;   // Gün batımı/alacakaranlık
+        const isDay = hour > 8 && hour < 17;          // Tam gündüz
+        const isNight = hour > 20 || hour < 5;        // Tam gece
+        
+        // Gündüz mü gece mi?
+        const isDayTime = hour >= 6 && hour <= 18;
+        
+        // Geçiş faktörleri hesapla
+        let morningFactor = 0, eveningFactor = 0, dayFactor = 0, nightFactor = 0;
+        
+        if (isMorning) {
+            morningFactor = (hour - 5) / 3; // 5 ile 8 arası için 0 ile 1 arası değer
+        } else if (isEvening) {
+            eveningFactor = (hour - 17) / 3; // 17 ile 20 arası için 0 ile 1 arası değer
+        } else if (isDay) {
+            dayFactor = 1; // Tam gündüz vakti
+        } else {
+            nightFactor = 1; // Tam gece vakti
+        }
+        
+        // Güncel durumu ayarla
+        this.isDay = isDayTime;
+        
+        // Renkler ve yoğunluklar için değişkenler
+        let skyColor, fogColor, fogDensity;
+        let sunIntensity, ambientIntensity, torchIntensity;
+        
+        if (isMorning) {
+            // Şafak/Gün doğumu renkleri (turuncu/pembe tonu)
+            const r = 0.5 + morningFactor * 0.3;  // Kızarıklık artıyor
+            const g = 0.3 + morningFactor * 0.5;  // Yeşillik artıyor
+            const b = 0.5 + morningFactor * 0.3;  // Mavi artıyor
+            
+            skyColor = new THREE.Color(r, g, b);
+            fogColor = new THREE.Color(r * 0.9, g * 0.8, b * 0.8);
+            fogDensity = 0.01 - morningFactor * 0.005;
+            
+            sunIntensity = 0.2 + morningFactor * 0.8;
+            ambientIntensity = 0.2 + morningFactor * 0.3;
+            torchIntensity = 5 - morningFactor * 4;
+        }
+        else if (isEvening) {
+            // Gün batımı renkleri (kızıl/turuncu tonu)
+            const r = 0.8 - eveningFactor * 0.5;  // Kızarıklık azalıyor
+            const g = 0.5 - eveningFactor * 0.4;  // Yeşillik azalıyor
+            const b = 0.4 - eveningFactor * 0.3;  // Mavi azalıyor
+            
+            skyColor = new THREE.Color(r, g, b);
+            fogColor = new THREE.Color(r * 0.8, g * 0.7, b * 0.8);
+            fogDensity = 0.005 + eveningFactor * 0.005;
+            
+            sunIntensity = 1.0 - eveningFactor * 0.9;
+            ambientIntensity = 0.5 - eveningFactor * 0.3;
+            torchIntensity = 1 + eveningFactor * 4;
+        }
+        else if (isDay) {
+            // Tam gündüz renkleri (açık mavi)
+            skyColor = new THREE.Color(0.4, 0.6, 0.8);
+            fogColor = new THREE.Color(0.5, 0.6, 0.8);
+            fogDensity = 0.004;
+            
+            sunIntensity = 1.0;
+            ambientIntensity = 0.5;
+            torchIntensity = 1.0;
+        }
+        else {
+            // Tam gece renkleri (koyu mavi)
+            skyColor = new THREE.Color(0.03, 0.03, 0.1);
+            fogColor = new THREE.Color(0.02, 0.02, 0.08);
+            fogDensity = 0.01;
+            
+            sunIntensity = 0.05;
+            ambientIntensity = 0.15;
+            torchIntensity = 5;
+        }
+        
+        // Gökyüzü rengi güncelle
+        this.sceneManager.scene.background = skyColor;
+        
+        // Sis efekti güncelle
+        this.sceneManager.scene.fog = new THREE.FogExp2(fogColor, fogDensity);
+        
+        // Ambient ışık güncelle
+        if (this.sceneManager.ambientLight) {
+            this.sceneManager.ambientLight.intensity = ambientIntensity;
+        }
+        
+        // Meşaleleri güncelle
+        if (this.sceneManager.objects.torches) {
+            this.sceneManager.objects.torches.forEach(torch => {
+                torch.setIntensity(torchIntensity);
+            });
+        }
+        
+        // Güneş ve gölgeler için güncelleme
+        this.updateSunPosition(hour, sunHeight, sunIntensity, updateShadows);
+        
+        // Gece/gündüz geçiş butonu metnini güncelle
+        if (isDayTime) {
+            this.dayNightToggle.textContent = "Geceye Geç";
+        } else {
+            this.dayNightToggle.textContent = "Gündüze Geç";
+        }
+    }    // Güneş pozisyonu ve gölgeleri ayrı bir fonksiyonda güncelle
+    updateSunPosition(hour, sunHeight = null, sunIntensity = null, updateShadows = true) {
+        if (!this.sceneManager.directionalLight) return;
+        
+        // sunHeight veya sunIntensity değerleri verilmediyse hesaplayalım
+        if (sunHeight === null || sunIntensity === null) {
+            // Güneş yüksekliği ve yoğunluğu saat değerine göre hesaplama
+            
+            // 1. Günün saatine göre yükseklik faktörünü hesapla
+            let calculatedSunHeight;
+            let calculatedSunIntensity;
+            
+            const isMorning = hour >= 5 && hour <= 8;
+            const isEvening = hour >= 17 && hour <= 20;
+            const isDay = hour > 8 && hour < 17;
+            
+            if (isDay) {
+                // Gün boyunca
+                const dayProgress = (hour - 8) / 9; // 8-17 arası için 0-1
+                calculatedSunHeight = Math.sin(dayProgress * Math.PI);
+                calculatedSunIntensity = 1.0;
+            } else if (isMorning) {
+                // Gün doğumu
+                const morningFactor = (hour - 5) / 3; // 5-8 arası için 0-1
+                calculatedSunHeight = morningFactor * 0.5;
+                calculatedSunIntensity = 0.2 + morningFactor * 0.8;
+            } else if (isEvening) {
+                // Gün batımı
+                const eveningFactor = (hour - 17) / 3; // 17-20 arası için 0-1
+                calculatedSunHeight = 0.5 - eveningFactor * 0.5;
+                calculatedSunIntensity = 1.0 - eveningFactor * 0.9;
+            } else {
+                // Gece
+                calculatedSunHeight = -0.2;
+                calculatedSunIntensity = 0.05;
+            }
+            
+            sunHeight = calculatedSunHeight;
+            sunIntensity = calculatedSunIntensity;
+        }
+        
+        // Güneşin gökyüzündeki konumunu hesapla
+        // Tam bir 24 saatlik dönüş için
+        const angleInRadians = ((hour - 6) / 24) * Math.PI * 2;
+        
+        // Daha gerçekçi bir eliptik yörünge
+        const distance = 100;
+        const x = Math.sin(angleInRadians) * distance;
+        const z = Math.cos(angleInRadians) * distance;
+        
+        // Güneş yüksekliği, gündüz en yüksekte (y=100), gece yeraltında (y=-100)
+        let y = 0;
+        
+        if (hour > 6 && hour < 18) {
+            // Gündüz - sinüs eğrisi şeklinde yüksek bir yay
+            const dayProgress = (hour - 6) / 12; // 0-1 arası
+            y = Math.sin(dayProgress * Math.PI) * 100;
+        } else {
+            // Gece - yeraltında
+            const nightProgress = (hour < 6) ? (hour + 6) / 12 : (hour - 18) / 12;
+            y = -Math.sin(nightProgress * Math.PI) * 50; // Yeraltında daha alçak bir yay
+        }
+        
+        // Hesaplanan pozisyonu hedef ve mevcut pozisyon olarak ayarla
+        // Yalnızca gölge güncellemelerinde doğrudan pozisyonu değiştir
+        if (updateShadows) {
+            // Doğrudan güncelleme - gölge güncellemesi gerektiğinde
+            this.sceneManager.directionalLight.position.set(x, y, z);
+            // Mevcut konumu da güncelle ki lerp ile yumuşak geçiş yapabilelim
+            this.currentSunPosition.copy(this.sceneManager.directionalLight.position);
+        }
+        
+        // Her durumda hedef pozisyonu güncelle (yumuşak geçiş için)
+        this.targetSunPosition.set(x, y, z);
+        
+        // Işık yoğunluğunu güncelle
+        this.sceneManager.directionalLight.intensity = sunIntensity;
+        
+        // Gölgeleri seçici şekilde güncelle
+        if (updateShadows) {
+            // Gölgeleri zorla güncelle ve gölge haritasını yeniden oluştur
+            this.renderer.shadowMap.needsUpdate = true;
+            
+            // Gölge kamerasını güneş konumuna göre ayarla
+            if (this.sceneManager.directionalLight.shadow) {
+                const shadowCamera = this.sceneManager.directionalLight.shadow.camera;
+                
+                // Gölge kamerasını güncelle
+                shadowCamera.updateProjectionMatrix();
+                
+                // Sahnenin durumuna göre gölge ayarlarını optimize et
+                this.sceneManager.directionalLight.shadow.needsUpdate = true;
+            }
+        }
+    }
+
+    // Güneşin hedef pozisyonunu hesaplayan yeni metod
+    calculateTargetSunPosition(hour) {
+        if (!this.sceneManager.directionalLight) return;
+        
+        // Açıyı hesapla (saat 6'da doğu, 18'de batı)
+        const angleInRadians = ((hour - 6) / 24) * Math.PI * 2;
+        
+        // Daha gerçekçi bir eliptik yörünge
+        const distance = 100;
+        const x = Math.sin(angleInRadians) * distance;
+        const z = Math.cos(angleInRadians) * distance;
+        
+        // Güneş yüksekliği, gündüz en yüksekte (y=100), gece yeraltında (y=-100)
+        let y = 0;
+        
+        if (hour > 6 && hour < 18) {
+            // Gündüz - sinüs eğrisi şeklinde yüksek bir yay
+            const dayProgress = (hour - 6) / 12; // 0-1 arası
+            y = Math.sin(dayProgress * Math.PI) * 100;
+        } else {
+            // Gece - yeraltında
+            const nightProgress = (hour < 6) ? (hour + 6) / 12 : (hour - 18) / 12;
+            y = -Math.sin(nightProgress * Math.PI) * 50; // Yeraltında daha alçak bir yay
+        }
+        
+        // Hesaplanan pozisyonu hedef pozisyon olarak ayarla
+        this.targetSunPosition.set(x, y, z);
     }
     
-    // Saate göre gün/gece döngüsü
-    updateTimeOfDay(hour) {
-        // Gece: 20-6 arası, Gündüz: 6-20 arası
-        if (hour >= 20 || hour <= 6) {
-            // Gece modu
-            this.isDay = false;
-            this.sceneManager.scene.background = new THREE.Color(0x000033);
-            
-            if (this.sceneManager.directionalLight) {
-                this.sceneManager.directionalLight.intensity = 0.1;
-            }
-            if (this.sceneManager.ambientLight) {
-                this.sceneManager.ambientLight.intensity = 0.2;
-            }
-            
-            // Meşaleleri parlat
-            if (this.sceneManager.objects.torches) {
-                this.sceneManager.objects.torches.forEach(torch => {
-                    torch.setIntensity(5);
-                });
-            }
-            
-            this.sceneManager.scene.fog = new THREE.FogExp2(0x000033, 0.01);
-            this.dayNightToggle.textContent = "Gündüze Geç";
-        } else {
-            // Gündüz modu - güneş pozisyonunu hesapla
-            this.isDay = true;
-            
-            // Saat 6-18 arası güneş hareketi (0-180 derece)
-            const normalizedHour = Math.max(6, Math.min(18, hour));
-            this.sunAngle = ((normalizedHour - 6) / 12) * Math.PI; // 0 - PI arası
-            
-            // Güneş pozisyonu
-            if (this.sceneManager.directionalLight) {
-                const x = Math.sin(this.sunAngle) * 100;
-                const y = Math.cos(this.sunAngle) * 100 + 50;
-                const z = 50;
-                
-                this.sceneManager.directionalLight.position.set(x, y, z);
-                
-                // Güneş yüksekliğine göre parlaklık
-                const intensity = Math.max(0.3, Math.cos(this.sunAngle - Math.PI/2) * 0.8);
-                this.sceneManager.directionalLight.intensity = intensity;
-            }
-            
-            // Gökyüzü rengi - güneş pozisyonuna göre
-            const skyIntensity = Math.max(0.2, Math.cos(this.sunAngle - Math.PI/2));
-            const skyColor = new THREE.Color().setHSL(0.6, 0.6, 0.4 + skyIntensity * 0.4);
-            this.sceneManager.scene.background = skyColor;
-            
-            if (this.sceneManager.ambientLight) {
-                this.sceneManager.ambientLight.intensity = 0.3 + skyIntensity * 0.3;
-            }
-            
-            // Meşaleleri söndür
-            if (this.sceneManager.objects.torches) {
-                this.sceneManager.objects.torches.forEach(torch => {
-                    torch.setIntensity(1);
-                });
-            }
-              this.sceneManager.scene.fog = new THREE.FogExp2(0xcccccc, 0.005);
-            this.dayNightToggle.textContent = "Geceye Geç";
-        }
+    // Yumuşak güneş hareketi için interpolasyon metodu
+    smoothUpdateSunPosition() {
+        if (!this.sceneManager.directionalLight) return;
+        
+        // Güneşin mevcut pozisyonunu al
+        this.currentSunPosition.copy(this.sceneManager.directionalLight.position);
+        
+        // Linear interpolation (LERP) ile güneş pozisyonunu yumuşat
+        this.currentSunPosition.lerp(this.targetSunPosition, this.sunLerpFactor);
+        
+        // Yeni pozisyonu uygula
+        this.sceneManager.directionalLight.position.copy(this.currentSunPosition);
     }
 
     toggleHandTorch() {
@@ -742,11 +987,46 @@ class App {
             } else if (this.currentFPS >= 25) {
                 this.lowPerfWarningShown = false; // FPS düzelirse uyarıyı sıfırla
             }
-        }
-          // Memory cleanup kontrolü (60 saniyede bir - daha az sıklıkla)
+        }        // Memory cleanup kontrolü (60 saniyede bir - daha az sıklıkla)
         if (currentTime - this.lastMemoryCleanup > 60000) { // 60 saniyede bir
             this.performMemoryCleanup();
             this.lastMemoryCleanup = currentTime;
+        }          // Otomatik zaman akışı
+        if (this.autoTimeFlow) {
+            // Zamanı ilerlet
+            this.timeOfDay += this.deltaTime * this.timeFlowSpeed;
+            
+            // 24 saatlik döngüyü sağla
+            if (this.timeOfDay >= 24) {
+                this.timeOfDay -= 24;
+            }
+              // Her frame'de sadece ışık ve renk geçişlerini güncelle - gölgeleri değil
+            this.updateTimeOfDay(this.timeOfDay, false);
+            
+            // Güneş pozisyonunu belirli aralıklarla güncelle ve hedef pozisyonu belirle
+            const shadowUpdateInterval = this.shadowUpdateFrequency * 1000;
+            if (currentTime - this.lastShadowUpdate > shadowUpdateInterval) {
+                // Güneş pozisyonu için yeni hedef belirle
+                this.calculateTargetSunPosition(this.timeOfDay);
+                
+                // Tam güncelleme ile gölgeleri güncelle (gerçek güncelleme shadow map için)
+                this.updateSunPosition(this.timeOfDay, null, null, true);
+                this.lastShadowUpdate = currentTime;
+            } else {
+                // Ara karelerde yumuşak geçiş için lerp uygula
+                this.smoothUpdateSunPosition();
+            }
+            
+            // HTML slider ve göstergeyi sadece belirli aralıklarla güncelle (performans için)
+            if (Math.floor(currentTime / 2000) !== Math.floor(this.lastTimeUpdate / 2000)) {  // 2 saniyede bir
+                this.lastTimeUpdate = currentTime;
+                
+                // HTML slider'ı ve göstergeyi de güncelle
+                const timeSlider = document.getElementById('time-slider');
+                const timeDisplay = document.getElementById('time-display');
+                if (timeSlider) timeSlider.value = this.timeOfDay;
+                if (timeDisplay) timeDisplay.textContent = this.timeOfDay.toFixed(1);
+            }
         }
         
         // Scene güncellemeleri
