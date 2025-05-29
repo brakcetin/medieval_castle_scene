@@ -94,9 +94,13 @@ class App {
         this.markerPosition = 0; // 0-100 arası
         this.markerDirection = 1; // 1 = sağa, -1 = sola
         this.markerSpeed = 1.5; // Hareket hızı
-        this.pendingCatapult = null; // Güç barı için bekleyen mancınık
-        this.pendingStone = null; // Güç barı için bekleyen taş
+        this.pendingCatapult = null; // Güç barı için bekleyen mancınık        this.pendingStone = null; // Güç barı için bekleyen taş
         this.animationId = null; // Animation frame ID
+        
+        // ESC Menü Sistemi
+        this.isGamePaused = false;
+        this.settingsMenuElement = null;
+        this.escHintElement = null;
         
         // Başlatma
         this.init();
@@ -204,13 +208,16 @@ class App {
         
         // GUI oluşturma
         this.setupGUI();
-        
-        // Modelleri yükle
+          // Modelleri yükle
         this.loadModels();
         
-        // Animasyon döngüsünü başlat
+        // ESC Menü Sistemini Başlat
+        this.initializeEscMenu();
+          // Animasyon döngüsünü başlat
         this.animate();
-    }    setupGUI() {
+    }
+
+    setupGUI() {
         console.log("setupGUI çağrıldı - HTML kontrolleri bağlanıyor...");
         
         // HTML slider kontrolleri
@@ -976,16 +983,22 @@ class App {
                 }
             });
         }
-    }
-
-    updateScore(value) {
+    }    updateScore(value) {
         this.sceneManager.score += value;
         this.scoreElement.textContent = this.sceneManager.score;
-    }    // Ana animasyon döngüsü - Performance optimized
+    }
+
+    // Ana animasyon döngüsü - Performance optimized
     animate() {
         requestAnimationFrame(this.animate.bind(this));
         
         const currentTime = performance.now();
+        
+        // Oyun duraklatıldıysa sadece render yap
+        if (this.isGamePaused) {
+            this.renderer.render(this.sceneManager.scene, this.camera);
+            return;
+        }
         
         // Delta time hesaplama (frame limiting kaldırıldı - daha akıcı performans için)
         this.deltaTime = this.clock.getDelta();
@@ -1105,9 +1118,20 @@ class App {
         this.camera.rotation.x = this.cameraPitch;
         this.camera.rotation.y = this.cameraYaw;
     }
-    
-    // Event handlers for camera movement
+      // Event handlers for camera movement
     onKeyDown(event) {
+        // ESC tuşu - menüyü aç/kapat (her zaman çalışsın)
+        if (event.code === 'Escape') {
+            event.preventDefault();
+            this.toggleSettingsMenu();
+            return;
+        }
+        
+        // Oyun duraklatıldıysa diğer tuşları engelle
+        if (this.isGamePaused) {
+            return;
+        }
+        
         switch(event.code) {
             case 'KeyW':
             case 'ArrowUp':
@@ -1127,7 +1151,7 @@ class App {
                 break;
             case 'KeyF':
                 this.toggleHandTorch();
-                break;            case 'Space':
+                break;case 'Space':
                 event.preventDefault();
                 // Power bar aktifse durdurmak için space tuşu
                 if (this.powerBarActive) {
@@ -1136,8 +1160,12 @@ class App {
                 break;
         }
     }
-    
-    onKeyUp(event) {
+      onKeyUp(event) {
+        // Oyun duraklatıldıysa tuşları engelle
+        if (this.isGamePaused) {
+            return;
+        }
+        
         switch(event.code) {
             case 'KeyW':
             case 'ArrowUp':
@@ -1154,9 +1182,10 @@ class App {
             case 'KeyD':
             case 'ArrowRight':
                 this.moveRight = false;
-                break;
-        }
-    }    onMouseDown(event) {
+                break;        }
+    }
+
+    onMouseDown(event) {
         // Sol tık (button === 0) ve sağ tık (button === 2) ile kamera kontrolü
         if (event.button === 0 || event.button === 2) {
             this.canRotate = true;
@@ -1212,6 +1241,11 @@ class App {
     onMouseMove(event) {
         if (!this.isFirstPersonMode) return;
         
+        // Oyun duraklatıldıysa mouse hareketini engelle
+        if (this.isGamePaused) {
+            return;
+        }
+        
         // Use movement from pointer lock if available, otherwise calculate manually
         let movementX, movementY;
         
@@ -1230,11 +1264,17 @@ class App {
         this.cameraYaw -= movementX * this.mouseSensitivity;
         this.cameraPitch -= movementY * this.mouseSensitivity;
         
-        // Limit pitch (prevent camera from flipping)
-        this.cameraPitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, this.cameraPitch));
-    }    onClick(event) {
+        // Limit pitch (prevent camera from flipping)        this.cameraPitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, this.cameraPitch));
+    }
+
+    onClick(event) {
         try {
             console.log("=== CLICK EVENT FIRED ===");
+            
+            // Oyun duraklatıldıysa tıklamaları engelle
+            if (this.isGamePaused) {
+                return;
+            }
             
             // Handle pointer lock request on first click
             if (!this.pointerLocked && this.isFirstPersonMode) {
@@ -1526,9 +1566,10 @@ class App {
                 event.stopPropagation();
                 this.stopPowerBar();
             }
-        });
-          console.log("🎯 Power bar sistemi başlatıldı");
-    }    // First-Person Mode System (Always Active)
+        });        console.log("🎯 Power bar sistemi başlatıldı");
+    }
+
+    // First-Person Mode System (Always Active)
     initializeFirstPersonMode() {
         console.log("🎯 Initializing first-person mode system (always active)...");
         
@@ -1862,8 +1903,7 @@ class App {
         // Pending referansları temizle
         this.pendingCatapult = null;
         this.pendingStone = null;
-        
-        console.log("🚀 Atış gerçekleştirildi, güç seviyesi:", powerLevel);
+          console.log("🚀 Atış gerçekleştirildi, güç seviyesi:", powerLevel);
     }
 
     addScore(points) {
@@ -1876,6 +1916,170 @@ class App {
         setTimeout(() => {
             this.scoreElement.classList.remove('score-update');
         }, 500);
+    }
+
+    // ESC Menü Sistemi
+    initializeEscMenu() {
+        console.log("🎮 ESC Menü sistemi başlatılıyor...");
+        
+        // DOM elementlerini bul
+        this.settingsMenuElement = document.getElementById('settings-menu');
+        this.escHintElement = document.getElementById('esc-hint');
+        
+        if (!this.settingsMenuElement) {
+            console.error("❌ Settings menu element bulunamadı!");
+            return;
+        }
+        
+        // Menü kapatma butonları
+        const closeBtn = document.getElementById('close-settings');
+        const resumeBtn = document.getElementById('resume-game');
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.closeSettingsMenu();
+            });
+        }
+        
+        if (resumeBtn) {
+            resumeBtn.addEventListener('click', () => {
+                this.closeSettingsMenu();
+            });
+        }
+        
+        // Overlay tıklamasında menüyü kapat
+        const overlay = document.querySelector('.settings-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    this.closeSettingsMenu();
+                }
+            });
+        }
+        
+        console.log("✅ ESC Menü sistemi başarıyla başlatıldı");
+    }
+    
+    openSettingsMenu() {
+        if (!this.settingsMenuElement) return;
+        
+        console.log("⚙️ Ayarlar menüsü açılıyor...");
+        
+        this.isGamePaused = true;
+        this.settingsMenuElement.classList.remove('hidden');
+        
+        // ESC ipucunu gizle
+        if (this.escHintElement) {
+            this.escHintElement.style.display = 'none';
+        }
+        
+        // Pointer lock'u serbest bırak
+        if (document.pointerLockElement) {
+            document.exitPointerLock();
+        }
+        
+        console.log("⚙️ Oyun duraklatıldı - Ayarlar menüsü açık");
+    }
+    
+    closeSettingsMenu() {
+        if (!this.settingsMenuElement) return;
+        
+        console.log("🎮 Ayarlar menüsü kapatılıyor...");
+        
+        this.isGamePaused = false;
+        this.settingsMenuElement.classList.add('hidden');
+        
+        // ESC ipucunu tekrar göster
+        if (this.escHintElement) {
+            this.escHintElement.style.display = 'block';
+        }
+          console.log("🎮 Oyun devam ediyor");
+    }
+    
+    // ESC Menü Sistemi Başlatma
+    initializeEscMenu() {
+        console.log("🎮 ESC Menü sistemi başlatılıyor...");
+        
+        // DOM elementlerini bul
+        this.settingsMenuElement = document.getElementById('settings-menu');
+        this.escHintElement = document.getElementById('esc-hint');
+        
+        if (!this.settingsMenuElement) {
+            console.error("❌ Settings menu element bulunamadı!");
+            return;
+        }
+        
+        // Menü kapatma butonları
+        const closeBtn = document.getElementById('close-settings');
+        const resumeBtn = document.getElementById('resume-game');
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.closeSettingsMenu();
+            });
+        }
+        
+        if (resumeBtn) {
+            resumeBtn.addEventListener('click', () => {
+                this.closeSettingsMenu();
+            });
+        }
+        
+        // Overlay tıklamasında menüyü kapat
+        const overlay = document.querySelector('.settings-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    this.closeSettingsMenu();
+                }
+            });
+        }
+          console.log("✅ ESC Menü sistemi başarıyla başlatıldı");
+    }
+    
+    openSettingsMenu() {
+        if (!this.settingsMenuElement) return;
+        
+        console.log("⚙️ Ayarlar menüsü açılıyor...");
+        
+        this.isGamePaused = true;
+        this.settingsMenuElement.classList.remove('hidden');
+        
+        // ESC ipucunu gizle
+        if (this.escHintElement) {
+            this.escHintElement.style.display = 'none';
+        }
+        
+        // Pointer lock'u serbest bırak
+        if (document.pointerLockElement) {
+            document.exitPointerLock();
+        }
+        
+        console.log("⚙️ Oyun duraklatıldı - Ayarlar menüsü açık");
+    }
+    
+    closeSettingsMenu() {
+        if (!this.settingsMenuElement) return;
+        
+        console.log("🎮 Ayarlar menüsü kapatılıyor...");
+        
+        this.isGamePaused = false;
+        this.settingsMenuElement.classList.add('hidden');
+        
+        // ESC ipucunu tekrar göster
+        if (this.escHintElement) {
+            this.escHintElement.style.display = 'block';
+        }
+        
+        console.log("🎮 Oyun devam ediyor");
+    }
+    
+    toggleSettingsMenu() {
+        if (this.isGamePaused) {
+            this.closeSettingsMenu();
+        } else {
+            this.openSettingsMenu();
+        }
     }
 }
 

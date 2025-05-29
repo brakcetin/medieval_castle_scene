@@ -12,23 +12,99 @@
     <div id="inventory-panel">
         <span id="inventory-status">🎒 Envanter: Boş</span>
     </div>
-    
-    <div id="controls-panel">
-        <button id="day-night-toggle">Gece/Gündüz</button>
+      <!-- ESC için ipucu -->
+    <div id="esc-hint">
+        <span>ESC tuşuna basarak ayarlar menüsünü açabilirsiniz</span>
     </div>
-    <div id="time-control-panel">
-        <h4>Zaman Kontrolü</h4>
-        <label for="time-slider">Saat: <span id="time-display">12</span></label>
-        <input type="range" id="time-slider" min="0" max="24" step="0.5" value="12">
-        <p>Gece: 20-6, Gündüz: 6-20</p>
-    </div>    <div id="instructions">
-        <h3>Oyun Kontrolleri:</h3>
-        <p><strong>W, A, S, D</strong> - Hareket</p>
-        <p><strong>Mouse Hareketleri    </strong> - Kamera</p>
-        <p><strong>Kayalara Tık</strong> - Taş Topla</p>
-        <p><strong>Mancınığa Tık</strong> - Yükle/Fırlat</p>
-        <p><strong>🎯 Güç Barı:</strong> <strong>Space</strong> ile atış</p>
-        <p><strong>F</strong> - El Meşalesi Aç/Kapat</p>
+
+    <!-- ESC Ayarlar Menüsü -->
+    <div id="settings-menu" class="hidden">
+        <div class="settings-overlay">
+            <div class="settings-panel">
+                <div class="settings-header">
+                    <h2>⚙️ Oyun Ayarları</h2>
+                    <button id="close-settings" class="close-btn">✕</button>
+                </div>
+                
+                <div class="settings-content">
+                    <!-- Hareket Kontrolleri -->
+                    <div class="settings-section">
+                        <h3>🎮 Hareket Kontrolleri</h3>
+                        <div class="controls-list">
+                            <div class="control-item">
+                                <span class="key-badge">W, A, S, D</span>
+                                <span>Hareket (İleri, Sol, Geri, Sağ)</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">Mouse</span>
+                                <span>Kamera Kontrolü</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">Sol Tık</span>
+                                <span>Taş Toplama / Mancınık Etkileşimi</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">Space</span>
+                                <span>Mancınık Atışı (Güç Barı)</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">F</span>
+                                <span>El Meşalesi Aç/Kapat</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">ESC</span>
+                                <span>Bu Menüyü Aç/Kapat</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Zaman Ayarları -->
+                    <div class="settings-section">
+                        <h3>🕐 Gece/Gündüz Döngüsü</h3>
+                        <div class="time-controls">
+                            <div class="control-group">
+                                <button id="day-night-toggle">🌅 Gece/Gündüz Değiştir</button>
+                            </div>
+                            <div class="control-group">
+                                <label for="time-slider">Saat: <span id="time-display">12</span></label>
+                                <input type="range" id="time-slider" min="0" max="24" step="0.5" value="12">
+                            </div>
+                            <div class="time-info">
+                                <p><span class="time-icon">☀️</span> Gündüz: 6:00 - 20:00</p>
+                                <p><span class="time-icon">🌙</span> Gece: 20:00 - 6:00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Oyun Açıklamaları -->
+                    <div class="settings-section">
+                        <h3>🏰 Oyun Hakkında</h3>
+                        <div class="game-info">
+                            <div class="info-item">
+                                <h4>🎯 Hedef</h4>
+                                <p>Mancınık kullanarak hedefleri vurarak puan kazanın</p>
+                            </div>
+                            <div class="info-item">
+                                <h4>🗿 Taş Toplama</h4>
+                                <p>Kayalara tıklayarak taş toplayın ve mancınığa yükleyin</p>
+                            </div>
+                            <div class="info-item">
+                                <h4>🎯 Güç Barı</h4>
+                                <p>Yeşil bölgede durdurmaya çalışın, daha iyi nişan alabilirsiniz</p>
+                            </div>
+                            <div class="info-item">
+                                <h4>🔥 Meşale</h4>
+                                <p>Gece görüş için F tuşu ile el meşalesi açabilirsiniz</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="settings-footer">
+                    <button id="resume-game" class="resume-btn">🎮 Oyuna Dön</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Power Bar UI -->
