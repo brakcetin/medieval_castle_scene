@@ -7,12 +7,17 @@ import { Catapult, Stone, Torch, HandTorch } from './objects.js';
 import { BasitSoundManager } from './SoundManager.js';
 
 // Ana uygulama sınıfı
-class App {
-    constructor() {
+class App {    constructor() {
         // DOM elementlerine erişim
         this.loadingElement = document.getElementById('loading');
         this.scoreElement = document.getElementById('score');
         this.dayNightToggle = document.getElementById('day-night-toggle');
+        
+        // Game Clock elements
+        this.gameTimeElement = document.getElementById('game-time');
+        this.timePeriodIconElement = document.getElementById('time-period-icon');
+        this.timePeriodTextElement = document.getElementById('time-period-text');
+        this.clockContainerElement = document.querySelector('.clock-container');
         
         // Three.js bileşenleri
         this.scene = null;
@@ -195,10 +200,13 @@ class App {
         window.addEventListener('mousemove', this.onMouseMove.bind(this));
         window.addEventListener('click', this.onClick.bind(this));
         this.dayNightToggle.addEventListener('click', this.toggleDayNight.bind(this));
-        
-        // Pointer lock event listeners
+          // Pointer lock event listeners
         document.addEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
         document.addEventListener('pointerlockerror', this.onPointerLockError.bind(this));
+        
+        // Pencere odak olaylarını dinle
+        window.addEventListener('focus', this.onWindowFocus.bind(this));
+        window.addEventListener('blur', this.onWindowBlur.bind(this));
         
         // Initialize first-person mode (now default)
         this.initializeFirstPersonMode();
@@ -452,9 +460,11 @@ class App {
                 torch.setIntensity(torchIntensity);
             });
         }
-        
-        // Güneş ve gölgeler için güncelleme
+          // Güneş ve gölgeler için güncelleme
         this.updateSunPosition(hour, sunHeight, sunIntensity, updateShadows);
+        
+        // Game Clock UI güncellemesi
+        this.updateGameClockUI(hour, isDayTime, isMorning, isEvening);
         
         // Gece/gündüz geçiş butonu metnini güncelle
         if (isDayTime) {
@@ -1405,12 +1415,15 @@ class App {
                             this.playerInventory.hasRock = true; // Taşı envantere ekle
                             this.playerInventory.collectedStone = stone; // Taşı referansını sakla
                             
+
                             // Envanter UI'nı güncelle
                             this.updateInventoryUI();
                             
+
                             // Ekranda toplama mesajı göster
                             this.showNotification("Taş toplandı! Mancınığa yüklemek için mancınığa tıklayın.", 3000, 'success');
                             
+
                             // Collection başarılı oldu, işlemi sonlandır
                             return;
                         } else {
@@ -1572,38 +1585,38 @@ class App {
     // First-Person Mode System (Always Active)
     initializeFirstPersonMode() {
         console.log("🎯 Initializing first-person mode system (always active)...");
-        
+
         // Get crosshair element
         this.crosshairElement = document.getElementById('crosshair');
-        
+
         if (!this.crosshairElement) {
             console.error("❌ Crosshair element not found! Check if #crosshair exists in HTML");
             return;
         }
-        
+
         console.log("✅ Found crosshair element:", this.crosshairElement);
-        
+
         // Enable first-person mode immediately (no toggle)
         this.enableFirstPersonMode();
-        
+
         console.log("🎯 First-person mode system initialized successfully (always active)");
     }
 
     // Enable first-person mode (called automatically, no toggle)
     enableFirstPersonMode() {
         console.log("🎯 Enabling first-person mode (automatic)...");
-        
+
         const body = document.body;
         body.classList.add('fps-mode');
         this.crosshairElement.style.display = 'block';
-        
+
         // Hide or remove the toggle button if it exists
         const fpsToggleElement = document.getElementById('fps-toggle');
         if (fpsToggleElement) {
             fpsToggleElement.style.display = 'none';
             console.log("🎯 FPS toggle button hidden (first-person is always active)");
         }
-        
+
         this.showNotification("🎯 Birinci Şahıs Modu Aktif! Bakmak için fare, etkileşim için ekranın ortasına tıklayın!", 3000, 'info');
         console.log("✅ First-person mode enabled successfully");
     }    // Pointer Lock Methods for FPS Controls
@@ -1613,11 +1626,12 @@ class App {
             canvas.requestPointerLock();
             console.log("🔒 Pointer lock requested");
         }
-    }
-
-    onPointerLockChange() {
+    }    onPointerLockChange() {
         const canvas = document.getElementById('scene-canvas');
         this.pointerLocked = (document.pointerLockElement === canvas);
+        
+        // İmleç görünürlüğünü güncelle
+        this.updateCursorVisibility();
         
         if (this.pointerLocked) {
             console.log("🔒 Pointer kilidi etkin - FPS kontrolleri etkin");
@@ -1632,6 +1646,42 @@ class App {
         console.error("❌ Pointer kilidi hatası oluştu");
         this.pointerLocked = false;
         this.showNotification("❌ FPS kontrolleri için fare kilitlenemedi", 2000, 'error');
+    }
+    
+    // Pencere odak olayları yönetimi
+    onWindowFocus() {
+        console.log("🪟 Pencere odak aldı");
+        this.updateCursorVisibility();
+    }
+    
+    onWindowBlur() {
+        console.log("🪟 Pencere odaktan çıktı");
+        // Pencere odaktan çıktığında fare imlecini her zaman görünür yap
+        document.body.style.cursor = 'default';
+    }
+    
+    // İmleç görünürlüğünü güncel duruma göre ayarlayan metod
+    updateCursorVisibility() {
+        // Pointer lock aktif değilse veya oyun duraklatılmışsa imleci görünür yap
+        if (!this.pointerLocked || this.isGamePaused) {
+            document.body.style.cursor = 'default';
+            console.log("🖱️ İmleç görünür yapıldı (pointer lock kapalı veya oyun duraklatıldı)");
+        } else {
+            document.body.style.cursor = 'none';
+            console.log("🖱️ İmleç gizlendi (pointer lock aktif)");
+        }
+    }
+    
+    // Pointer lock ipucu gösterme metodu
+    showPointerLockHint() {
+        console.log("🔒 Pointer lock ipucu gösteriliyor...");
+        this.showNotification("🖱️ FPS kontrollerini yeniden etkinleştirmek için ekrana tıklayın", 4000, 'info');
+        
+        // Ek olarak bir puls animasyonu ile crosshair'i vurgula
+        const crosshair = document.getElementById('crosshair');
+        if (crosshair) {
+            crosshair.style.animation = 'pulse 1s ease-in-out 3';
+        }
     }
 
     // First-person click handler with center-screen raycasting
@@ -1956,44 +2006,7 @@ class App {
                 }
             });
         }
-        
-        console.log("✅ ESC Menü sistemi başarıyla başlatıldı");
-    }
-    
-    openSettingsMenu() {
-        if (!this.settingsMenuElement) return;
-        
-        console.log("⚙️ Ayarlar menüsü açılıyor...");
-        
-        this.isGamePaused = true;
-        this.settingsMenuElement.classList.remove('hidden');
-        
-        // ESC ipucunu gizle
-        if (this.escHintElement) {
-            this.escHintElement.style.display = 'none';
-        }
-        
-        // Pointer lock'u serbest bırak
-        if (document.pointerLockElement) {
-            document.exitPointerLock();
-        }
-        
-        console.log("⚙️ Oyun duraklatıldı - Ayarlar menüsü açık");
-    }
-    
-    closeSettingsMenu() {
-        if (!this.settingsMenuElement) return;
-        
-        console.log("🎮 Ayarlar menüsü kapatılıyor...");
-        
-        this.isGamePaused = false;
-        this.settingsMenuElement.classList.add('hidden');
-        
-        // ESC ipucunu tekrar göster
-        if (this.escHintElement) {
-            this.escHintElement.style.display = 'block';
-        }
-          console.log("🎮 Oyun devam ediyor");
+          console.log("✅ ESC Menü sistemi başarıyla başlatıldı");
     }
     
     // ESC Menü Sistemi Başlatma
@@ -2036,8 +2049,7 @@ class App {
         }
           console.log("✅ ESC Menü sistemi başarıyla başlatıldı");
     }
-    
-    openSettingsMenu() {
+      openSettingsMenu() {
         if (!this.settingsMenuElement) return;
         
         console.log("⚙️ Ayarlar menüsü açılıyor...");
@@ -2048,17 +2060,21 @@ class App {
         // ESC ipucunu gizle
         if (this.escHintElement) {
             this.escHintElement.style.display = 'none';
-        }
-        
-        // Pointer lock'u serbest bırak
+        }        // Önce cursor'u açıkça görünür yap - FPS modundayken ve pencere odağı kaybolsa bile
+        document.body.style.cursor = 'default';
+        // Cursor görünürlüğünü garantiye almak için !important ekle
+        document.documentElement.style.setProperty('cursor', 'auto', 'important');
+        console.log("🖱️ İmleç menü için görünür yapıldı (zorunlu görünürlük)");
+          
+        // Sonra pointer lock'u serbest bırak
+        // Bu sıralama önemli, böylece cursor her zaman görünür olur
         if (document.pointerLockElement) {
             document.exitPointerLock();
         }
         
         console.log("⚙️ Oyun duraklatıldı - Ayarlar menüsü açık");
     }
-    
-    closeSettingsMenu() {
+      closeSettingsMenu() {
         if (!this.settingsMenuElement) return;
         
         console.log("🎮 Ayarlar menüsü kapatılıyor...");
@@ -2069,9 +2085,55 @@ class App {
         // ESC ipucunu tekrar göster
         if (this.escHintElement) {
             this.escHintElement.style.display = 'block';
+        }        // Birinci şahıs modundaysa pointer lock ipucunu göster
+        if (this.isFirstPersonMode) {
+            this.showPointerLockHint();
+        }        // Birinci şahıs modundaysa, imleç görünürlüğünü güncel duruma göre ayarla
+        if (this.isFirstPersonMode) {
+            this.updateCursorVisibility();
+            console.log("🖱️ İmleç görünürlüğü güncellendi - Pointer lock durumuna göre");
         }
         
         console.log("🎮 Oyun devam ediyor");
+    }
+    
+    updateGameClockUI(hour, isDayTime, isMorning, isEvening) {
+        if (!this.gameTimeElement || !this.timePeriodIconElement || !this.timePeriodTextElement || !this.clockContainerElement) {
+            return;
+        }
+        
+        // Saat formatını güncelle (HH:MM formatında)
+        const hours = Math.floor(hour);
+        const minutes = Math.floor((hour - hours) * 60);
+        const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        this.gameTimeElement.textContent = timeString;
+        
+        // Zaman periyoduna göre ikon ve metin güncelleme
+        let periodIcon, periodText, periodClass;
+        
+        if (isMorning) {
+            periodIcon = '🌅';
+            periodText = 'Şafak';
+            periodClass = 'sunrise';
+        } else if (isEvening) {
+            periodIcon = '🌇';
+            periodText = 'Alacakaranlık';
+            periodClass = 'sunset';
+        } else if (isDayTime) {
+            periodIcon = '☀️';
+            periodText = 'Gündüz';
+            periodClass = 'day';
+        } else {
+            periodIcon = '🌙';
+            periodText = 'Gece';
+            periodClass = 'night';
+        }
+        
+        this.timePeriodIconElement.textContent = periodIcon;
+        this.timePeriodTextElement.textContent = periodText;
+        
+        // Clock container'ın sınıflarını güncelle
+        this.clockContainerElement.className = `clock-container ${periodClass}`;
     }
     
     toggleSettingsMenu() {

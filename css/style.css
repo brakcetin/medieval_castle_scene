@@ -431,6 +431,18 @@ body {
     100% { transform: translate(-50%, -50%) scale(1); }
 }
 
+/* Pointer lock hint pulse animation */
+@keyframes pulse {
+    0%, 100% { 
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0.7;
+    }
+}
+
 /* First-person mode toggle button */
 #fps-toggle {
     position: fixed;
@@ -742,4 +754,86 @@ body {
     background: linear-gradient(45deg, #38a169, #2f855a);
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Game Clock Panel */
+#game-clock-panel {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    z-index: 10;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    min-width: 120px;
+}
+
+.clock-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.time-display {
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+.time-period {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+#time-period-icon {
+    font-size: 14px;
+    animation: time-pulse 3s ease-in-out infinite;
+}
+
+#time-period-text {
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Time period animations */
+@keyframes time-pulse {
+    0%, 100% { 
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% { 
+        transform: scale(1.1);
+        filter: brightness(1.3);
+    }
+}
+
+/* Day/Night themed colors */
+.clock-container.day {
+    color: #ffeb3b;
+    text-shadow: 0 0 8px rgba(255, 235, 59, 0.6);
+}
+
+.clock-container.night {
+    color: #e3f2fd;
+    text-shadow: 0 0 8px rgba(227, 242, 253, 0.6);
+}
+
+.clock-container.sunrise {
+    color: #ff9800;
+    text-shadow: 0 0 8px rgba(255, 152, 0, 0.6);
+}
+
+.clock-container.sunset {
+    color: #e91e63;
+    text-shadow: 0 0 8px rgba(233, 30, 99, 0.6);
 }
