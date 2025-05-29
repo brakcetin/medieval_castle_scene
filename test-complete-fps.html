@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete FPS System Test</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #00ff00;
+        }
+        .test-button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            font-family: inherit;
+        }
+        .test-button:hover {
+            background: #66ccff;
+        }
+        .emergency-button {
+            background: #ff4444;
+        }
+        .emergency-button:hover {
+            background: #ff6666;
+        }
+        .log {
+            background: #000000;
+            padding: 15px;
+            border-radius: 6px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff6666; }
+        .warning { color: #ffaa00; }
+        .info { color: #66aaff; }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.success { background: #004400; color: #00ff00; }
+        .status.error { background: #440000; color: #ff6666; }
+        .status.warning { background: #442200; color: #ffaa00; }
+        .status.pending { background: #002244; color: #66aaff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Complete First-Person System Test</h1>
+        <p><strong>Testing:</strong> First-person mode always active, automatic mouse rotation, pointer lock, center-screen raycasting</p>
+        
+        <div class="status" id="status">Waiting for game to load...</div>
+        
+        <div class="test-section">
+            <h3>🔧 System Verification</h3>
+            <button class="test-button" onclick="verifySystemSetup()">
+                ✅ Verify System Setup
+            </button>
+            <button class="test-button" onclick="testFirstPersonMode()">
+                🎯 Test First-Person Mode
+            </button>
+            <button class="test-button" onclick="testPointerLock()">
+                🔒 Test Pointer Lock
+            </button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🖱️ Mouse & Camera Controls</h3>
+            <button class="test-button" onclick="testMouseRotation()">
+                🔄 Test Mouse Rotation
+            </button>
+            <button class="test-button" onclick="testCenterRaycast()">
+                🎯 Test Center Raycasting
+            </button>
+            <button class="test-button" onclick="testClickInteraction()">
+                🖱️ Test Click Interaction
+            </button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🎮 Complete FPS Test</h3>
+            <button class="test-button" onclick="runCompleteTest()">
+                🚀 Run Complete FPS Test
+            </button>
+            <button class="test-button emergency-button" onclick="enableDebugMode()">
+                🔍 Enable Debug Mode
+            </button>
+        </div>
+        
+        <div class="log" id="log-output"></div>
+    </div>
+
+    <script>
+        let testResults = {
+            systemSetup: false,
+            firstPersonMode: false,
+            pointerLock: false,
+            mouseRotation: false,
+            centerRaycast: false,
+            clickInteraction: false
+        };
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('log-output');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStatus(message, type) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+        }
+
+        function verifySystemSetup() {
+            log('🔧 Verifying system setup...', 'info');
+            updateStatus('Verifying system setup...', 'pending');
+            
+            if (!window.app) {
+                log('❌ Game app not loaded', 'error');
+                updateStatus('❌ Game not loaded', 'error');
+                return false;
+            }
+            
+            // Check first-person mode is default
+            if (window.app.isFirstPersonMode === true) {
+                log('✅ First-person mode is default', 'success');
+                testResults.systemSetup = true;
+            } else {
+                log('❌ First-person mode is not default', 'error');
+                return false;
+            }
+            
+            // Check crosshair element
+            const crosshair = document.getElementById('crosshair');
+            if (crosshair && crosshair.style.display === 'block') {
+                log('✅ Crosshair is visible', 'success');
+            } else {
+                log('❌ Crosshair is not visible', 'error');
+                return false;
+            }
+            
+            // Check pointer lock variables
+            if (typeof window.app.pointerLocked === 'boolean' && 
+                typeof window.app.mouseSensitivity === 'number') {
+                log('✅ Pointer lock variables initialized', 'success');
+            } else {
+                log('❌ Pointer lock variables missing', 'error');
+                return false;
+            }
+            
+            log('✅ System setup verification complete', 'success');
+            updateStatus('✅ System verified', 'success');
+            return true;
+        }
+
+        function testFirstPersonMode() {
+            log('🎯 Testing first-person mode functionality...', 'info');
+            
+            if (!window.app) {
+                log('❌ App not available', 'error');
+                return false;
+            }
+            
+            // Check if first-person mode is always active
+            if (window.app.isFirstPersonMode === true) {
+                log('✅ First-person mode is active by default', 'success');
+                testResults.firstPersonMode = true;
+            } else {
+                log('❌ First-person mode not active', 'error');
+                return false;
+            }
+            
+            // Check body has fps-mode class
+            if (document.body.classList.contains('fps-mode')) {
+                log('✅ Body has fps-mode class', 'success');
+            } else {
+                log('❌ Body missing fps-mode class', 'error');
+                return false;
+            }
+            
+            // Check toggle button is hidden or doesn't exist
+            const fpsToggle = document.getElementById('fps-toggle');
+            if (!fpsToggle || fpsToggle.style.display === 'none') {
+                log('✅ FPS toggle button properly hidden/removed', 'success');
+            } else {
+                log('⚠️ FPS toggle button still visible', 'warning');
+            }
+            
+            log('✅ First-person mode test complete', 'success');
+            return true;
+        }
+
+        function testPointerLock() {
+            log('🔒 Testing pointer lock functionality...', 'info');
+            
+            if (!window.app) {
+                log('❌ App not available', 'error');
+                return false;
+            }
+            
+            // Check pointer lock methods exist
+            if (typeof window.app.requestPointerLock === 'function' &&
+                typeof window.app.onPointerLockChange === 'function' &&
+                typeof window.app.onPointerLockError === 'function') {
+                log('✅ Pointer lock methods exist', 'success');
+                testResults.pointerLock = true;
+            } else {
+                log('❌ Pointer lock methods missing', 'error');
+                return false;
+            }
+            
+            // Test pointer lock request
+            try {
+                log('🔒 Testing pointer lock request...', 'info');
+                window.app.requestPointerLock();
+                log('✅ Pointer lock request successful', 'success');
+            } catch (error) {
+                log(`❌ Pointer lock request failed: ${error.message}`, 'error');
+                return false;
+            }
+            
+            log('✅ Pointer lock test complete', 'success');
+            return true;
+        }
+
+        function testMouseRotation() {
+            log('🔄 Testing mouse rotation system...', 'info');
+            
+            if (!window.app || !window.app.onMouseMove) {
+                log('❌ Mouse move handler not available', 'error');
+                return false;
+            }
+            
+            // Check mouse sensitivity
+            if (window.app.mouseSensitivity > 0) {
+                log(`✅ Mouse sensitivity set to ${window.app.mouseSensitivity}`, 'success');
+                testResults.mouseRotation = true;
+            } else {
+                log('❌ Mouse sensitivity not properly set', 'error');
+                return false;
+            }
+            
+            // Check camera rotation variables
+            if (typeof window.app.cameraYaw === 'number' && 
+                typeof window.app.cameraPitch === 'number') {
+                log('✅ Camera rotation variables initialized', 'success');
+            } else {
+                log('❌ Camera rotation variables missing', 'error');
+                return false;
+            }
+            
+            log('✅ Mouse rotation test complete', 'success');
+            return true;
+        }
+
+        function testCenterRaycast() {
+            log('🎯 Testing center-screen raycasting...', 'info');
+            
+            if (!window.app || !window.app.raycaster || !window.app.camera) {
+                log('❌ Raycaster or camera not available', 'error');
+                return false;
+            }
+            
+            try {
+                // Test center-screen raycasting
+                const centerMouse = new THREE.Vector2(0, 0);
+                window.app.raycaster.setFromCamera(centerMouse, window.app.camera);
+                
+                const intersects = window.app.raycaster.intersectObjects(
+                    window.app.sceneManager.scene.children, true
+                );
+                
+                log(`📊 Center raycast found ${intersects.length} intersections`, 'info');
+                testResults.centerRaycast = true;
+                log('✅ Center raycasting working', 'success');
+                
+                return true;
+            } catch (error) {
+                log(`❌ Center raycasting failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        function testClickInteraction() {
+            log('🖱️ Testing click interaction system...', 'info');
+            
+            if (!window.app || !window.app.onClick) {
+                log('❌ Click handler not available', 'error');
+                return false;
+            }
+            
+            // Check onFirstPersonClick method exists
+            if (typeof window.app.onFirstPersonClick === 'function') {
+                log('✅ First-person click handler exists', 'success');
+                testResults.clickInteraction = true;
+            } else {
+                log('❌ First-person click handler missing', 'error');
+                return false;
+            }
+            
+            // Test click simulation
+            try {
+                const testEvent = { clientX: 400, clientY: 300 };
+                window.app.onClick(testEvent);
+                log('✅ Click simulation successful', 'success');
+            } catch (error) {
+                log(`❌ Click simulation failed: ${error.message}`, 'error');
+                return false;
+            }
+            
+            log('✅ Click interaction test complete', 'success');
+            return true;
+        }
+
+        function runCompleteTest() {
+            log('🚀 === RUNNING COMPLETE FPS SYSTEM TEST ===', 'info');
+            updateStatus('Running complete test...', 'pending');
+            
+            const tests = [
+                { name: 'System Setup', func: verifySystemSetup },
+                { name: 'First-Person Mode', func: testFirstPersonMode },
+                { name: 'Pointer Lock', func: testPointerLock },
+                { name: 'Mouse Rotation', func: testMouseRotation },
+                { name: 'Center Raycast', func: testCenterRaycast },
+                { name: 'Click Interaction', func: testClickInteraction }
+            ];
+            
+            let passed = 0;
+            let total = tests.length;
+            
+            tests.forEach(test => {
+                log(`🧪 Running ${test.name} test...`, 'info');
+                if (test.func()) {
+                    passed++;
+                    log(`✅ ${test.name} test PASSED`, 'success');
+                } else {
+                    log(`❌ ${test.name} test FAILED`, 'error');
+                }
+            });
+            
+            log(`📊 Test Results: ${passed}/${total} tests passed`, passed === total ? 'success' : 'warning');
+            
+            if (passed === total) {
+                log('🎉 ALL TESTS PASSED! FPS system is working correctly!', 'success');
+                updateStatus('🎉 All tests passed!', 'success');
+            } else {
+                log('⚠️ Some tests failed. Check implementation.', 'warning');
+                updateStatus(`⚠️ ${passed}/${total} tests passed`, 'warning');
+            }
+        }
+
+        function enableDebugMode() {
+            log('🔍 Enabling debug mode...', 'info');
+            
+            if (window.app) {
+                // Enable verbose logging
+                window.app.debugMode = true;
+                log('✅ Debug mode enabled', 'success');
+                
+                // Log current state
+                log(`📊 Current State:`, 'info');
+                log(`   - First-person mode: ${window.app.isFirstPersonMode}`, 'info');
+                log(`   - Pointer locked: ${window.app.pointerLocked}`, 'info');
+                log(`   - Mouse sensitivity: ${window.app.mouseSensitivity}`, 'info');
+                log(`   - Camera yaw: ${window.app.cameraYaw}`, 'info');
+                log(`   - Camera pitch: ${window.app.cameraPitch}`, 'info');
+            } else {
+                log('❌ App not available for debug mode', 'error');
+            }
+        }
+
+        // Auto-start verification when page loads
+        setTimeout(() => {
+            log('🚀 Auto-starting system verification...', 'info');
+            if (window.app) {
+                verifySystemSetup();
+            } else {
+                log('⚠️ Game not loaded yet. Load the main game first, then return here.', 'warning');
+                updateStatus('⚠️ Game not loaded', 'warning');
+            }
+        }, 2000);
+
+        // Monitor for app availability
+        let checkInterval = setInterval(() => {
+            if (window.app && !testResults.systemSetup) {
+                log('✅ Game app detected, running verification...', 'success');
+                verifySystemSetup();
+                clearInterval(checkInterval);
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

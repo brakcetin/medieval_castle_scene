@@ -367,3 +367,93 @@ body {
         transform: scale(1.05);
     }
 }
+
+/* First-Person Interaction System */
+/* Hide cursor completely when in first-person mode */
+.fps-mode {
+    cursor: none !important;
+}
+
+.fps-mode * {
+    cursor: none !important;
+}
+
+/* Crosshair/Targeting Reticle */
+#crosshair {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+    z-index: 999;
+    display: block;
+}
+
+#crosshair::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 4px;
+    background: #fff;
+    border: 1px solid #000;
+    border-radius: 50%;
+    box-shadow: 
+        0 0 2px rgba(0, 0, 0, 0.8),
+        0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+#crosshair::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 2px;
+    background: #ff0000;
+    border-radius: 50%;
+    z-index: 1;
+}
+
+/* Crosshair animation on hover/interaction */
+#crosshair.active::before {
+    animation: crosshair-pulse 0.5s ease-in-out;
+}
+
+@keyframes crosshair-pulse {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.5); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* First-person mode toggle button */
+#fps-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border: 2px solid #fff;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+#fps-toggle:hover {
+    background: rgba(50, 50, 50, 0.9);
+    transform: scale(1.05);
+}
+
+#fps-toggle.active {
+    background: rgba(255, 100, 0, 0.8);
+    border-color: #ff6400;
+    box-shadow: 0 0 10px rgba(255, 100, 0, 0.5);
+}

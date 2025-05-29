@@ -71,10 +71,14 @@ class App {
         
         // Kamera rotasyon açıları için ayrı değişkenler
         this.cameraYaw = 0; // Y ekseni etrafında dönüş (sağa/sola)
-        this.cameraPitch = 0; // X ekseni etrafında dönüş (yukarı/aşağı)
-          // Etkileşim için yeni değişkenler
+        this.cameraPitch = 0; // X ekseni etrafında dönüş (yukarı/aşağı)        // Etkileşim için yeni değişkenler
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
+          // First-Person Mode variables (now default)
+        this.isFirstPersonMode = true;  // Changed to true as default
+        this.crosshairElement = null;
+        this.pointerLocked = false;     // Track pointer lock state
+        this.mouseSensitivity = 0.002;  // Mouse sensitivity for FPS controls
           // Mancınık etkileşim sistemi
         this.playerInventory = { 
             hasRock: false,
@@ -180,16 +184,20 @@ class App {
             if (this.scoreElement) {
                 this.scoreElement.textContent = "0";
             }
-        };
-          // Olay dinleyiciler
+        };        // Event listeners for FPS mode
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
         window.addEventListener('keydown', this.onKeyDown.bind(this));
         window.addEventListener('keyup', this.onKeyUp.bind(this));
-        window.addEventListener('mousedown', this.onMouseDown.bind(this));
-        window.addEventListener('mouseup', this.onMouseUp.bind(this));
         window.addEventListener('mousemove', this.onMouseMove.bind(this));
-        this.dayNightToggle.addEventListener('click', this.toggleDayNight.bind(this));
         window.addEventListener('click', this.onClick.bind(this));
+        this.dayNightToggle.addEventListener('click', this.toggleDayNight.bind(this));
+        
+        // Pointer lock event listeners
+        document.addEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
+        document.addEventListener('pointerlockerror', this.onPointerLockError.bind(this));
+        
+        // Initialize first-person mode (now default)
+        this.initializeFirstPersonMode();
         
         // Power Bar DOM elementlerini başlat
         this.initializePowerBar();
@@ -1090,7 +1098,7 @@ class App {
             this.camera.position.z -= Math.sin(this.cameraYaw) * moveSpeed;
         }
         
-        // Kamera yükseklik sınırları
+        // Kamera yüksekliğini sınırla
         this.camera.position.y = Math.max(0.5, Math.min(50, this.camera.position.y));
         
         // Kamera rotasyonunu uygula
@@ -1200,33 +1208,47 @@ class App {
                 document.exitPointerLock();
             }
         }
-    }
-      onMouseMove(event) {
-        if (this.canRotate) {
-            let movementX, movementY;
-            
-            // Pointer lock varsa movementX/Y kullan, yoksa el ile hesapla
-            if (document.pointerLockElement) {
-                movementX = event.movementX || 0;
-                movementY = event.movementY || 0;
-            } else {
-                // El ile hesaplama (pointer lock yoksa)
-                movementX = event.clientX - (this.lastMouseX || event.clientX);
-                movementY = event.clientY - (this.lastMouseY || event.clientY);
-                this.lastMouseX = event.clientX;
-                this.lastMouseY = event.clientY;
-            }
-              // Mouse hassasiyetini iyileştir
-            const sensitivity = 0.003; // Hassasiyeti artır (0.002'den 0.003'e)
-            this.cameraYaw -= movementX * sensitivity;
-            this.cameraPitch -= movementY * sensitivity;
-            
-            // Pitch sınırları (yukarı/aşağı bakma)
-            this.cameraPitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, this.cameraPitch));
+    }    // FPS-style mouse movement
+    onMouseMove(event) {
+        if (!this.isFirstPersonMode) return;
+        
+        // Use movement from pointer lock if available, otherwise calculate manually
+        let movementX, movementY;
+        
+        if (document.pointerLockElement === document.getElementById('scene-canvas')) {
+            movementX = event.movementX || 0;
+            movementY = event.movementY || 0;
+        } else {
+            // Fallback for when pointer lock is not active
+            movementX = event.clientX - (this.lastMouseX || event.clientX);
+            movementY = event.clientY - (this.lastMouseY || event.clientY);
+            this.lastMouseX = event.clientX;
+            this.lastMouseY = event.clientY;
         }
+        
+        // Apply mouse sensitivity
+        this.cameraYaw -= movementX * this.mouseSensitivity;
+        this.cameraPitch -= movementY * this.mouseSensitivity;
+        
+        // Limit pitch (prevent camera from flipping)
+        this.cameraPitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, this.cameraPitch));
     }    onClick(event) {
         try {
             console.log("=== CLICK EVENT FIRED ===");
+            
+            // Handle pointer lock request on first click
+            if (!this.pointerLocked && this.isFirstPersonMode) {
+                this.requestPointerLock();
+                return;
+            }
+            
+            // In first-person mode, always use center-screen raycasting
+            if (this.isFirstPersonMode) {
+                this.onFirstPersonClick();
+                return;
+            }
+            
+            // Legacy mouse-based interaction (not used in FPS mode)
             console.log("Click coordinates:", event.clientX, event.clientY);
             console.log("Window size:", window.innerWidth, window.innerHeight);
             
@@ -1505,8 +1527,219 @@ class App {
                 this.stopPowerBar();
             }
         });
+          console.log("🎯 Power bar sistemi başlatıldı");
+    }    // First-Person Mode System (Always Active)
+    initializeFirstPersonMode() {
+        console.log("🎯 Initializing first-person mode system (always active)...");
         
-        console.log("🎯 Power bar sistemi başlatıldı");
+        // Get crosshair element
+        this.crosshairElement = document.getElementById('crosshair');
+        
+        if (!this.crosshairElement) {
+            console.error("❌ Crosshair element not found! Check if #crosshair exists in HTML");
+            return;
+        }
+        
+        console.log("✅ Found crosshair element:", this.crosshairElement);
+        
+        // Enable first-person mode immediately (no toggle)
+        this.enableFirstPersonMode();
+        
+        console.log("🎯 First-person mode system initialized successfully (always active)");
+    }
+
+    // Enable first-person mode (called automatically, no toggle)
+    enableFirstPersonMode() {
+        console.log("🎯 Enabling first-person mode (automatic)...");
+        
+        const body = document.body;
+        body.classList.add('fps-mode');
+        this.crosshairElement.style.display = 'block';
+        
+        // Hide or remove the toggle button if it exists
+        const fpsToggleElement = document.getElementById('fps-toggle');
+        if (fpsToggleElement) {
+            fpsToggleElement.style.display = 'none';
+            console.log("🎯 FPS toggle button hidden (first-person is always active)");
+        }
+        
+        this.showNotification("🎯 Birinci Şahıs Modu Aktif! Bakmak için fare, etkileşim için ekranın ortasına tıklayın!", 3000, 'info');
+        console.log("✅ First-person mode enabled successfully");
+    }    // Pointer Lock Methods for FPS Controls
+    requestPointerLock() {
+        const canvas = document.getElementById('scene-canvas');
+        if (canvas && document.pointerLockElement !== canvas) {
+            canvas.requestPointerLock();
+            console.log("🔒 Pointer lock requested");
+        }
+    }
+
+    onPointerLockChange() {
+        const canvas = document.getElementById('scene-canvas');
+        this.pointerLocked = (document.pointerLockElement === canvas);
+        
+        if (this.pointerLocked) {
+            console.log("🔒 Pointer kilidi etkin - FPS kontrolleri etkin");
+            this.showNotification("🎮 FPS Kontrolleri Aktif! Fare kilidini açmak için ESC", 2000, 'success');
+        } else {
+            console.log("🔓 Pointer lock deactivated");
+            this.showNotification("🖱️ Fare kilidi açıldı - FPS kontrollerini yeniden etkinleştirmek için tıklayın", 2000, 'info');
+        }
+    }
+
+    onPointerLockError() {
+        console.error("❌ Pointer kilidi hatası oluştu");
+        this.pointerLocked = false;
+        this.showNotification("❌ FPS kontrolleri için fare kilitlenemedi", 2000, 'error');
+    }
+
+    // First-person click handler with center-screen raycasting
+    onFirstPersonClick() {
+        if (!this.isFirstPersonMode) return;
+        
+        console.log("🎯 Birinci şahıs tıklaması tespit edildi");
+        
+        // Use center of screen (0, 0) for raycasting
+        const centerMouse = new THREE.Vector2(0, 0);
+        this.raycaster.setFromCamera(centerMouse, this.camera);
+        
+        // Get all intersections from center screen
+        const allIntersects = this.raycaster.intersectObjects(this.sceneManager.scene.children, true);
+        
+        // Filter for visible and interactive objects
+        const intersects = allIntersects.filter(intersection => {
+            const obj = intersection.object;
+            
+            // Must be visible
+            if (!obj.visible) return false;
+            
+            // Parent chain must be visible
+            let parent = obj.parent;
+            while (parent) {
+                if (!parent.visible) return false;
+                parent = parent.parent;
+            }
+            
+            // Exclude collected stones
+            if (obj.userData && obj.userData.type === 'collected_stone') {
+                return false;
+            }
+            
+            return true;
+        });
+        
+        console.log(`🎯 First-person raycast found ${intersects.length} valid objects`);
+        
+        if (intersects.length > 0) {
+            const clickedObject = intersects[0].object;
+            console.log("🎯 First-person target:", clickedObject.type, clickedObject.name);
+            
+            // Add crosshair pulse animation
+            this.crosshairElement.classList.add('crosshair-pulse');
+            setTimeout(() => {
+                this.crosshairElement.classList.remove('crosshair-pulse');
+            }, 500);
+            
+            // Handle stone interaction
+            const stone = this.findStoneFromObject(clickedObject);
+            if (stone && !stone.isCollected && !stone.isBeingCollected) {
+                console.log("🎯 First-person stone interaction");
+                this.handleStoneInteraction(stone);
+                return;
+            }
+            
+            // Handle catapult interaction
+            if (clickedObject.userData && (clickedObject.userData.type === 'catapult_part' || clickedObject.userData.type === 'catapult')) {
+                console.log("🎯 First-person catapult interaction");
+                this.handleCatapultInteraction();
+                return;
+            }
+            
+            console.log("🎯 First-person click - no valid interaction target");
+        } else {
+            console.log("🎯 First-person click - no objects in crosshair");
+        }
+    }
+
+    // Helper method to find stone from clicked object
+    findStoneFromObject(clickedObject) {
+        // Method 1: Direct userData reference
+        if (clickedObject.userData && clickedObject.userData.type === 'stone' && clickedObject.userData.stoneRef) {
+            return clickedObject.userData.stoneRef;
+        }
+        
+        // Method 2: Search in stones array
+        if (this.sceneManager.objects.stones && Array.isArray(this.sceneManager.objects.stones)) {
+            return this.sceneManager.objects.stones.find(s => {
+                if (!s || !s.mesh) return false;
+                if (s.isCollected || s.isBeingCollected) return false;
+                if (!s.mesh.visible) return false;
+                
+                // Check if clicked object is the stone mesh or a child
+                if (s.mesh === clickedObject) return true;
+                
+                let parent = clickedObject.parent;
+                while (parent) {
+                    if (parent === s.mesh) return true;
+                    parent = parent.parent;
+                }
+                
+                return false;
+            });
+        }
+        
+        return null;
+    }
+
+    // Extract stone interaction logic
+    handleStoneInteraction(stone) {
+        // Check inventory limits
+        if (this.playerInventory.hasRock && this.playerInventory.collectedStone) {
+            this.showNotification("⚠️ Envanter dolu! Önce mevcut taşı kullanın!", 3000, 'warning');
+            return;
+        }
+        
+        console.log("📦 Attempting to collect stone...");
+        const collected = stone.collect();
+        
+        if (collected) {
+            console.log("✅ Stone collected successfully");
+            this.playerInventory.hasRock = true;
+            this.playerInventory.collectedStone = stone;
+            this.updateInventoryUI();
+            this.showNotification("✅ Taş toplandı! Mancınığa yüklemek için mancınığa tıklayın!", 3000, 'success');
+        } else {
+            console.log("❌ Stone collection failed");
+            stone.isBeingCollected = false;
+        }
+    }
+
+    // Extract catapult interaction logic
+    handleCatapultInteraction() {
+        const catapult = this.sceneManager.objects.catapult;
+        
+        // Load stone if player has one
+        if (this.playerInventory.hasRock && this.playerInventory.collectedStone && catapult && !catapult.hasStone) {
+            console.log("📦 Loading stone into catapult...");
+            
+            const loaded = catapult.loadStone(this.playerInventory.collectedStone);
+            if (loaded) {
+                this.playerInventory.hasRock = false;
+                this.playerInventory.collectedStone = null;
+                this.updateInventoryUI();
+                this.showNotification("✅ Taş mancınığa yüklendi! Fırlatmak için tekrar tıklayın!", 3000, 'success');
+            }
+        }
+        // Start power bar if catapult is loaded
+        else if (catapult && catapult.hasStone) {
+            console.log("🎯 Starting power bar...");
+            this.startPowerBar(catapult, catapult.loadedStone);
+            this.showNotification("🎯 Doğru zamanda tıklayarak atış gücünü belirleyin!", 3000, 'info');
+        }
+        // No stone warning
+        else {
+            this.showNotification("⚠️ Önce bir taş toplamalısınız!", 3000, 'warning');
+        }
     }
 
     startPowerBar(catapult, stone) {

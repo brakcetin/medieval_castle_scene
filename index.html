@@ -24,10 +24,10 @@
     </div>    <div id="instructions">
         <h3>Oyun Kontrolleri:</h3>
         <p><strong>W, A, S, D</strong> - Hareket</p>
-        <p><strong>Sol Tık + Sürükle</strong> - Kamera</p>
+        <p><strong>Mouse Hareketleri    </strong> - Kamera</p>
         <p><strong>Kayalara Tık</strong> - Taş Topla</p>
         <p><strong>Mancınığa Tık</strong> - Yükle/Fırlat</p>
-        <p><strong>🎯 Güç Barı:</strong> Tık veya <strong>Space</strong> ile dur</p>
+        <p><strong>🎯 Güç Barı:</strong> <strong>Space</strong> ile atış</p>
         <p><strong>F</strong> - El Meşalesi Aç/Kapat</p>
     </div>
 
@@ -42,11 +42,17 @@
             <div class="zone red-zone"></div>
             <div id="power-marker"></div>
         </div>
-        <div id="power-bar-instruction">Tıklayarak atışı gerçekleştir</div>
+        <div id="power-bar-instruction">Boşluk (SPACE) tuşuna basarak atışı gerçekleştir</div>
     </div>
 
     <div id="loading">Yükleniyor...</div>
     <canvas id="scene-canvas"></canvas>
+
+    <!-- First-Person Crosshair -->
+    <div id="crosshair"></div>
+    
+    <!-- First-Person Mode Toggle -->
+    <button id="fps-toggle">🎯 First-Person Mode</button>
 
     <!-- Three.js ve İlgili Kütüphaneler -->
     <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>    <script type="importmap">
