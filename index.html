@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ortaçağ Kale Sahnesi</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>    <div id="score-panel">Puan: <span id="score">0</span></div>
+    
+    <!-- Game Clock Display -->
+    <div id="game-clock-panel">
+        <div class="clock-container">
+            <div class="time-display">
+                <span id="game-time">12:00</span>
+            </div>
+            <div class="time-period">
+                <span id="time-period-icon">☀️</span>
+                <span id="time-period-text">Gündüz</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Inventory Indicator -->
+    <div id="inventory-panel">
+        <span id="inventory-status">🎒 Envanter: Boş</span>
+    </div>
+      <!-- ESC için ipucu -->
+    <div id="esc-hint">
+        <span>ESC tuşuna basarak ayarlar menüsünü açabilirsiniz</span>
+    </div>
+
+    <!-- ESC Ayarlar Menüsü -->
+    <div id="settings-menu" class="hidden">
+        <div class="settings-overlay">
+            <div class="settings-panel">
+                <div class="settings-header">
+                    <h2>⚙️ Oyun Ayarları</h2>
+                    <button id="close-settings" class="close-btn">✕</button>
+                </div>
+                
+                <div class="settings-content">
+                    <!-- Hareket Kontrolleri -->
+                    <div class="settings-section">
+                        <h3>🎮 Hareket Kontrolleri</h3>
+                        <div class="controls-list">
+                            <div class="control-item">
+                                <span class="key-badge">W, A, S, D</span>
+                                <span>Hareket (İleri, Sol, Geri, Sağ)</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">Mouse</span>
+                                <span>Kamera Kontrolü</span>
+                            </div>                            <div class="control-item">
+                                <span class="key-badge">Sol Tık</span>
+                                <span>Taş Toplama / Mancınık Etkileşimi / Meşale Kontrolü</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">Space</span>
+                                <span>Mancınık Atışı (Güç Barı)</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">F</span>
+                                <span>El Meşalesi Aç/Kapat</span>
+                            </div>
+                            <div class="control-item">
+                                <span class="key-badge">ESC</span>
+                                <span>Bu Menüyü Aç/Kapat</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Zaman Ayarları -->
+                    <div class="settings-section">
+                        <h3>🕐 Gece/Gündüz Döngüsü</h3>
+                        <div class="time-controls">
+                            <div class="control-group">
+                                <button id="day-night-toggle">🌅 Gece/Gündüz Değiştir</button>
+                            </div>
+                            <div class="control-group">
+                                <label for="time-slider">Saat: <span id="time-display">12</span></label>
+                                <input type="range" id="time-slider" min="0" max="24" step="0.5" value="12">
+                            </div>
+                            <div class="time-info">
+                                <p><span class="time-icon">☀️</span> Gündüz: 6:00 - 20:00</p>
+                                <p><span class="time-icon">🌙</span> Gece: 20:00 - 6:00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Oyun Açıklamaları -->
+                    <div class="settings-section">
+                        <h3>🏰 Oyun Hakkında</h3>
+                        <div class="game-info">
+                            <div class="info-item">
+                                <h4>🎯 Hedef</h4>
+                                <p>Mancınık kullanarak hedefleri vurarak puan kazanın</p>
+                            </div>
+                            <div class="info-item">
+                                <h4>🗿 Taş Toplama</h4>
+                                <p>Kayalara tıklayarak taş toplayın ve mancınığa yükleyin</p>
+                            </div>
+                            <div class="info-item">
+                                <h4>🎯 Güç Barı</h4>
+                                <p>Yeşil bölgede durdurmaya çalışın, daha iyi nişan alabilirsiniz</p>
+                            </div>                            <div class="info-item">
+                                <h4>🔥 Meşale Sistemi</h4>
+                                <p>• F tuşu ile el meşalesi aç/kapat<br>
+                                • Duvar meşalelerine tıklayarak manuel kontrol<br>
+                                • Otomatik: Gece açık, gündüz kapalı<br>
+                                • Manuel: Tıklayınca otomatik sistem devre dışı</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="settings-footer">
+                    <button id="resume-game" class="resume-btn">🎮 Oyuna Dön</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Power Bar UI -->
+    <div id="power-bar-container" class="hidden">
+        <div id="power-bar-title">🎯 Nişan Alma - Doğru Zamanda Tıkla!</div>
+        <div id="power-bar">
+            <div class="zone red-zone"></div>
+            <div class="zone yellow-zone"></div>
+            <div class="zone green-zone"></div>
+            <div class="zone yellow-zone"></div>
+            <div class="zone red-zone"></div>
+            <div id="power-marker"></div>
+        </div>
+        <div id="power-bar-instruction">Boşluk (SPACE) tuşuna basarak atışı gerçekleştir</div>
+    </div>
+
+    <div id="loading">Yükleniyor...</div>
+    <canvas id="scene-canvas"></canvas>
+
+    <!-- First-Person Crosshair -->
+    <div id="crosshair"></div>
+    
+    <!-- First-Person Mode Toggle -->
+    <button id="fps-toggle">🎯 First-Person Mode</button>
+
+    <!-- Three.js ve İlgili Kütüphaneler -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "dat.gui": "https://unpkg.com/dat.gui@0.7.9/build/dat.gui.module.js"
+            }
+        }
+    </script>
+    
+    <!-- dat.GUI Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>    <!-- Uygulama Kodları -->
+    <script type="module" src="js/main.js"></script>    <!-- Stone Click Diagnosis Tool -->
+    <script src="stone-click-diagnosis.js"></script>
+    
+    <!-- Hızlı Taş Tıklama Test Scripti -->
+    <script src="hizli-test.js"></script>
+      <script>
+        // Sayfa yüklendiğinde otomatik olarak sahneyi sıfırla
+        window.addEventListener('load', function() {
+            console.log("Sayfa yüklendi, uygulama başlatılıyor...");
+            console.log("💡 Taş tıklama testi için F12 açın ve console'u kontrol edin");
+            // resetScene fonksiyonu App sınıfı içinde tanımlanacak, 
+            // bu yüzden sadece uygulamanın başlamasına izin ver
+            
+            // Uygulama nesnesini kontrol et
+            setTimeout(function() {
+                if (!window.app) {
+                    console.error("⚠️ UYARI: window.app nesnesi bulunamadı! main.js dosyasında bir hata olabilir.");
+                } else {
+                    console.log("✅ window.app nesnesi başarıyla oluşturuldu!");
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
