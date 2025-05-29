@@ -746,6 +746,12 @@ export class Torch {
         this.flickerSpeed = 0.5;
         this.flickerIntensity = 0.2;
         this.time = Math.random() * 1000; // Random start time for varied flickering
+        
+        // Otomatik gece/gündüz ve manuel kontrol özellikleri
+        this.autoMode = true; // Otomatik gece/gündüz modu
+        this.manualOverride = false; // Manuel kontrolle açma/kapama
+        this.isLit = true; // Meşalenin yanıp yanmadığını takip eder
+        this.baseIntensity = 4; // Temel ışık yoğunluğu
     }
     
     load() {
@@ -755,11 +761,16 @@ export class Torch {
             this.model = gltf.scene;
             this.model.position.copy(this.position);
             this.model.scale.set(0.1, 0.1, 0.1); // Boyutu çok daha küçük ayarla
-            
-            this.model.traverse((child) => {
+              this.model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+                    // Tıklanabilir userData ekle - GLTF model için
+                    child.userData = {
+                        type: 'torch',
+                        torchRef: this,
+                        isClickable: true
+                    };
                 }
             });
             
@@ -776,8 +787,7 @@ export class Torch {
             this.model = new THREE.Mesh(torchGeometry, torchMaterial);
             this.model.position.copy(this.position);
             this.model.castShadow = true;
-            
-            // Alev - daha küçük
+              // Alev - daha küçük
             const flameGeometry = new THREE.SphereGeometry(0.05, 8, 8);
             const flameMaterial = new THREE.MeshBasicMaterial({ 
                 color: this.color,
@@ -794,11 +804,18 @@ export class Torch {
             this.light.castShadow = true;
             this.model.add(this.light);
             
+            // Tıklanabilir userData ekle - fallback torch için
+            this.model.userData = {
+                type: 'torch',
+                torchRef: this,
+                isClickable: true
+            };
+            
             this.scene.add(this.model); // Fixed: using add instead of addObject
         });
     }
-        update(deltaTime) {
-        if (!this.model) return;
+    update(deltaTime) {
+        if (!this.model || !this.isLit) return; // Sadece yanık meşaleler güncellenir
         
         // Performance: Update interval azaltma
         this.updateCounter = (this.updateCounter || 0) + 1;
@@ -812,13 +829,13 @@ export class Torch {
         // Calculate flicker based on noise
         const flicker = Math.sin(this.time * this.flickerSpeed) * this.flickerIntensity;
         
-        // Apply flicker to light intensity if light exists
-        if (this.light) {
+        // Apply flicker to light intensity if light exists and torch is lit
+        if (this.light && this.isLit) {
             this.light.intensity = this.intensity * (1 + flicker);
         }
         
         // Apply flicker to flame size if flame exists (daha az sıklıkla)
-        if (this.flame && this.updateCounter % 6 === 0) {
+        if (this.flame && this.updateCounter % 6 === 0 && this.isLit) {
             const scale = 1 + flicker * 0.5;
             this.flame.scale.set(scale, scale, scale);
         }
@@ -830,8 +847,7 @@ export class Torch {
             this.light.intensity = value;
         }
     }
-    
-    // Meşaleye ışık ekleyen yardımcı metod - AssetLoader ile kullanılır
+      // Meşaleye ışık ekleyen yardımcı metod - AssetLoader ile kullanılır
     addLight() {
         if (!this.model) {
             console.error("Meşale modeli hazır değil, ışık eklenemedi");
@@ -855,21 +871,68 @@ export class Torch {
         this.flame.position.y = 0.3; // Alevin pozisyonu
         this.model.add(this.flame);
         
+        // Tıklanabilir userData ekle - meşale parçalarına
+        this.model.traverse((child) => {
+            if (child.isMesh) {
+                child.userData = {
+                    type: 'torch',
+                    torchRef: this,
+                    isClickable: true
+                };
+            }
+        });
+        
         console.log("Meşale ışığı ve alev efekti eklendi:", this.position);
     }
-    
-    // Toggle the torch on/off
+      // Toggle the torch on/off
     toggle() {
         if (!this.light) return false;
         
-        const wasLit = this.light.intensity > 0;
-        this.light.intensity = wasLit ? 0 : this.intensity;
+        // Manuel kontrol moduna geç
+        this.manualOverride = true;
+        this.autoMode = false;
         
-        if (this.flame) {
-            this.flame.visible = !wasLit;
+        // Meşaleyi aç/kapat
+        this.isLit = !this.isLit;
+        this.updateTorchState();
+        
+        return this.isLit;
+    }
+    
+    // Meşalenin durumunu günceller (ışık ve alev)
+    updateTorchState() {
+        if (!this.light) return;
+        
+        if (this.isLit) {
+            this.light.intensity = this.intensity;
+            if (this.flame) {
+                this.flame.visible = true;
+            }
+        } else {
+            this.light.intensity = 0;
+            if (this.flame) {
+                this.flame.visible = false;
+            }
         }
-        
-        return wasLit;
+    }
+    
+    // Otomatik gece/gündüz modunu ayarlar
+    setAutoMode(isDayTime) {
+        if (!this.manualOverride) {
+            this.isLit = !isDayTime; // Gündüz kapalı, gece açık
+            this.updateTorchState();
+        }
+    }
+    
+    // Manuel kontrolü sıfırla ve otomatik moda dön
+    resetToAutoMode() {
+        this.manualOverride = false;
+        this.autoMode = true;
+    }
+    
+    // Meşalenin manuel kontrol durumunu kontrol eder
+    isManuallyControlled() {
+        return this.manualOverride;
     }
 }
 

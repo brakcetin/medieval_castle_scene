@@ -508,9 +508,8 @@ export class SceneManager {
         
         console.log("Stone physics başlatıldı! Güç:", adjustedPower);
     }
-    
-    updateScore(points) {
-        this.score += points;
+      updateScore(points) {
+        this.score = Math.max(0, this.score + points); // Ensure score never goes below 0
         document.getElementById('score').textContent = this.score;
     }
       update(deltaTime) {

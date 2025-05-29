@@ -453,11 +453,18 @@ class App {    constructor() {
         if (this.sceneManager.ambientLight) {
             this.sceneManager.ambientLight.intensity = ambientIntensity;
         }
-        
-        // Meşaleleri güncelle
+          // Meşaleleri güncelle - otomatik gece/gündüz modu ve manuel kontrol
         if (this.sceneManager.objects.torches) {
             this.sceneManager.objects.torches.forEach(torch => {
-                torch.setIntensity(torchIntensity);
+                // Sadece otomatik modda olan meşaleleri güncelle
+                if (torch.autoMode && !torch.manualOverride) {
+                    torch.setAutoMode(isDayTime);
+                }
+                // Tüm meşalelerin temel yoğunluğunu güncelle (manuel olanlar dahil)
+                torch.baseIntensity = torchIntensity;
+                if (torch.isLit) {
+                    torch.intensity = torchIntensity;
+                }
             });
         }
           // Güneş ve gölgeler için güncelleme
@@ -994,7 +1001,7 @@ class App {    constructor() {
             });
         }
     }    updateScore(value) {
-        this.sceneManager.score += value;
+        this.sceneManager.score = Math.max(0, this.sceneManager.score + value); // Ensure score never goes below 0
         this.scoreElement.textContent = this.sceneManager.score;
     }
 
@@ -1462,7 +1469,12 @@ class App {    constructor() {
                     // Taş yok uyarısı
                     else {
                         this.showNotification("⚠️ Önce bir taş toplamalısınız!", 3000, 'warning');
-                    }
+                    }                }
+                
+                // Meşale kontrolü - Manuel açma/kapama
+                else if (clickedObject.userData && clickedObject.userData.type === 'torch' && clickedObject.userData.torchRef) {
+                    console.log("🔥 Meşale tıklandı");
+                    this.handleTorchInteraction(clickedObject.userData.torchRef);
                 }
                 
                 // Debug için - genel nesne bilgisi
@@ -1738,11 +1750,17 @@ class App {    constructor() {
                 this.handleStoneInteraction(stone);
                 return;
             }
-            
-            // Handle catapult interaction
+              // Handle catapult interaction
             if (clickedObject.userData && (clickedObject.userData.type === 'catapult_part' || clickedObject.userData.type === 'catapult')) {
                 console.log("🎯 First-person catapult interaction");
                 this.handleCatapultInteraction();
+                return;
+            }
+            
+            // Handle torch interaction
+            if (clickedObject.userData && clickedObject.userData.type === 'torch') {
+                console.log("🎯 First-person torch interaction");
+                this.handleTorchInteraction(clickedObject.userData.torchRef);
                 return;
             }
             
@@ -1803,9 +1821,7 @@ class App {    constructor() {
             console.log("❌ Stone collection failed");
             stone.isBeingCollected = false;
         }
-    }
-
-    // Extract catapult interaction logic
+    }    // Extract catapult interaction logic
     handleCatapultInteraction() {
         const catapult = this.sceneManager.objects.catapult;
         
@@ -1831,6 +1847,28 @@ class App {    constructor() {
         else {
             this.showNotification("⚠️ Önce bir taş toplamalısınız!", 3000, 'warning');
         }
+    }
+    
+    // Handle torch interaction - manuel açma/kapama
+    handleTorchInteraction(torch) {
+        if (!torch) return;
+        
+        console.log("🔥 Meşale ile etkileşim:", torch.position);
+        
+        // Meşaleyi aç/kapat (toggle)
+        const wasLit = torch.toggle();
+        
+        // Bildirim göster
+        if (torch.isLit) {
+            this.showNotification("🔥 Meşale yakıldı!", 2000, 'success');
+        } else {
+            this.showNotification("💨 Meşale söndürüldü!", 2000, 'info');
+        }
+        
+        // İsteğe bağlı: Puan verme
+        this.addScore(torch.isLit ? 2 : 1);
+        
+        console.log(`Meşale durumu: ${torch.isLit ? 'Yakık' : 'Sönük'}, Manuel kontrol: ${torch.manualOverride}`);
     }
 
     startPowerBar(catapult, stone) {
@@ -1913,19 +1951,17 @@ class App {    constructor() {
             // Sarı bölgeler - Good shot
             power = 0.7 + (Math.random() * 0.2); // 0.7-0.9 güç
             message = "👍 İyi atış! +7 puan";
-            points = 7;
-        } else {
+            points = 7;        } else {
             // Kırmızı bölgeler - Miss/Weak shot
             power = 0.3 + (Math.random() * 0.3); // 0.3-0.6 güç
-            message = "💥 Kaçtı! +1 puan";
-            points = 1;
+            message = "💥 Kaçtı! -10 puan";
+            points = -10;
         }
         
         // Puan ekle
         this.addScore(points);
-        
-        // Feedback göster
-        this.showNotification(message, 2500, points >= 10 ? 'success' : points >= 5 ? 'warning' : 'error');
+          // Feedback göster
+        this.showNotification(message, 2500, points >= 10 ? 'success' : points > 0 ? 'warning' : 'error');
         
         return power;
     }
@@ -1954,11 +1990,9 @@ class App {    constructor() {
         this.pendingCatapult = null;
         this.pendingStone = null;
           console.log("🚀 Atış gerçekleştirildi, güç seviyesi:", powerLevel);
-    }
-
-    addScore(points) {
+    }    addScore(points) {
         const currentScore = parseInt(this.scoreElement.textContent) || 0;
-        const newScore = currentScore + points;
+        const newScore = Math.max(0, currentScore + points); // Ensure score never goes below 0
         this.scoreElement.textContent = newScore.toString();
         
         // Score artış animasyonu için class ekle
