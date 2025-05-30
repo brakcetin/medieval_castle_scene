@@ -1,5 +1,5 @@
-- Burak Çetin
-- İsmail Görkem Ulaş
+- Burak Çetin: https://github.com/brakcetin
+- İsmail Görkem Ulaş: https://github.com/GorkemUlas
 
 - GitHub: https://github.com/brakcetin/medieval_castle_scene.git
 
